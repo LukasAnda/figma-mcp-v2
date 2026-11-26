@@ -10,6 +10,7 @@ import { NOT_CONNECTED, bridge } from "../bridge/bridge.js";
 import { figmaSend } from "../figma/rest.js";
 import { parseFigmaUrl } from "../figma/url.js";
 import { DESTRUCTIVE, READ_ONLY, WRITE, json, text } from "./common.js";
+import { importSteps, installPlugin, reveal } from "../plugin-setup.js";
 
 const fileUrl = z.string().optional().describe("Figma link (or file key) of the file to edit. Needed only when the plugin is open in more than one file.");
 const nodeId = z.string().min(1).describe('Node id, e.g. "12:345" (link form "12-345" also accepted)');
@@ -44,6 +45,27 @@ export function registerWriteTools(server: McpServer) {
       const list = bridge.listPlugins();
       if (!list.length) return text(`No plugin connected (bridge role: ${bridge.role}). ${NOT_CONNECTED}`);
       return json({ bridge: bridge.role, connected: list });
+    }
+  );
+
+  server.registerTool(
+    "figma_install_plugin",
+    {
+      title: "Install the Figma plugin",
+      description:
+        "Copies the companion \"Figma MCP Bridge\" plugin (needed for every editing tool) to a stable folder on this computer, shows it in Finder/Explorer, and returns the import steps for the user. Use it when figma_plugin_status reports no plugin and the user hasn't imported it yet. Later server updates refresh the copied files automatically.",
+      inputSchema: z.object({
+        dir: z.string().optional().describe("Target folder (default ~/figma-mcp-bridge-plugin)"),
+        reveal: z.boolean().default(true).describe("Open the folder in Finder/Explorer")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ dir, reveal: show }) => {
+      const r = await installPlugin(dir);
+      if (show) reveal(r.manifest);
+      return text(
+        `Figma plugin ${r.version} ${r.updated ? "updated" : "installed"} in ${r.dir}.\n\nTell the user:\n` + importSteps(r.manifest).map((s, i) => `${i + 1}. ${s}`).join("\n")
+      );
     }
   );
 

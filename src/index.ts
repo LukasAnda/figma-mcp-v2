@@ -19,11 +19,12 @@ import { loadStoredCredentials, runAuthCli } from "./auth.js";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
 import { bridge } from "./bridge/bridge.js";
+import { VERSION } from "./version.js";
+import { importSteps, installPlugin, refreshInstalledPlugin, reveal } from "./plugin-setup.js";
 import { registerReadTools } from "./tools/read.js";
 import { registerWriteTools } from "./tools/write.js";
 import { closeAllWebSessions } from "./web/client.js";
 
-const VERSION = "0.1.1";
 
 export function createServer(): McpServer {
   const server = new McpServer(
@@ -31,7 +32,7 @@ export function createServer(): McpServer {
     {
       instructions: `Figma tools. Pass Figma links as \`url\` (right-click a layer in Figma > Copy link to selection gives a link with node-id).
 Reading needs no Dev Mode and no token for files shared by link: figma_get_file (pages/frames) → figma_get_design (layout/styles/tokens spec) + figma_get_screenshot (see it) → figma_get_code (starting code) → figma_download_assets (icons/images). figma_get_variables / figma_get_styles / figma_get_components describe the design system.
-Editing needs the "Figma MCP Bridge" plugin running in the file; check with figma_plugin_status. Never edit unless the user asked for changes.
+Editing needs the "Figma MCP Bridge" plugin running in the file; check with figma_plugin_status, and use figma_install_plugin to set it up. Never edit unless the user asked for changes.
 Building designs: use figma_build_layout to create whole screens in one call (auto layout, components, variants, instances, token bindings, sections, arrows), then check the returned screenshot. Bind colors to variables (figma_bind_tokens) so themes work; figma_create_theme_variant makes dark (or other) variants. Present flows like a design team: one section per flow with a title, per-state headings with requirements, screens, short notes beside them, and arrows for navigation.`
     }
   );
@@ -73,8 +74,12 @@ if (cli === "login" || cli === "logout" || cli === "status") {
   process.exit(await runAuthCli(cli));
 }
 if (cli === "plugin") {
-  // Where the companion plugin lives, for Figma's "Import plugin from manifest" (also inside npx caches).
-  console.log(fileURLToPath(new URL("../plugin/manifest.json", import.meta.url)));
+  if (process.argv[3] === "install") {
+    // Copy the Figma plugin to a stable folder and show it, for "Import plugin from manifest".
+    const r = await installPlugin(process.argv[4]);
+    reveal(r.manifest);
+    console.log(`Figma plugin ${r.version} installed in ${r.dir}\n\n` + importSteps(r.manifest).map((s, i) => `${i + 1}. ${s}`).join("\n"));
+  } else console.log(fileURLToPath(new URL("../plugin/manifest.json", import.meta.url)));
   process.exit(0);
 }
 if (cli === "--version" || cli === "-v") {
@@ -89,11 +94,13 @@ Usage:
   figma-mcp-v2 login      store a personal access token and/or figma.com cookie
   figma-mcp-v2 status     show which credentials are configured
   figma-mcp-v2 logout     remove stored credentials
-  figma-mcp-v2 plugin     print the path of the Figma plugin manifest to import`);
+  figma-mcp-v2 plugin install [dir]   copy the Figma plugin to ~/figma-mcp-bridge-plugin (or dir) and show it
+  figma-mcp-v2 plugin     print the path of the bundled Figma plugin manifest`);
   process.exit(0);
 }
 
 loadStoredCredentials();
+void refreshInstalledPlugin();
 if (process.env.FIGMA_NO_BRIDGE !== "1") void bridge.start();
 
 const shutdown = () => {

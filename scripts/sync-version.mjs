@@ -7,7 +7,8 @@ const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 const edits = [
   [".claude-plugin/plugin.json", /("version":\s*")[^"]+(")/],
   ["gemini-extension.json", /("version":\s*")[^"]+(")/],
-  ["src/index.ts", /(const VERSION = ")[^"]+(")/],
+  ["src/version.ts", /(const VERSION = ")[^"]+(")/],
+  ["mcpb/manifest.json", /("version":\s*")[^"]+(")/],
   ["plugin/code.js", /(pluginVersion: ")[^"]+(")/]
 ];
 for (const [file, re] of edits) {

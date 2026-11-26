@@ -28,6 +28,9 @@ Run `npm run build && npm test` before finishing a change.
 - `src/web/`: anonymous viewer-protocol client (`client.ts`) and kiwi scene-graph -> REST-shaped
   JSON converter (`convert.ts`), including instance expansion with overrides.
 - `src/figma/`: URL parsing, REST client, the design simplifier and code generator.
+- `src/plugin-setup.ts`: copies the Figma plugin to a stable folder and refreshes it on updates.
+- `mcpb/`: Claude Desktop extension manifest and icon; `scripts/build-bundles.mjs` packs it with
+  production dependencies and resvg binaries for every platform.
 - `src/tokens/dtcg.ts`: Figma variables -> W3C DTCG 2025.10 token files and resolver.
 - `src/render/`: local SVG renderer and PNG rasterizing in a child process (resvg can panic).
 - `src/bridge/bridge.ts`: WebSocket hub on 127.0.0.1:3055; extra server processes relay through
@@ -46,8 +49,9 @@ npm version patch   # or minor / major: bumps package.json and syncs the version
 git push --follow-tags
 ```
 
-The `Release` workflow tests and publishes the tag to npm (trusted publishing, with provenance) and
-creates a GitHub release. Never publish from a laptop except for the very first version.
+The `Release` workflow tests and publishes the tag to npm (trusted publishing, with provenance),
+builds the Claude Desktop extension (`figma-mcp-v2.mcpb`) and the Figma plugin zip with
+`npm run bundle`, and attaches both to a GitHub release. Never publish from a laptop except for the very first version.
 
 ## Rules
 

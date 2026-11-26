@@ -28,7 +28,9 @@ jobs:
           expected="v$(node -p "require('./package.json').version")"
           if [ "$GITHUB_REF_NAME" != "$expected" ]; then echo "Tag $GITHUB_REF_NAME does not match package.json ($expected)"; exit 1; fi
       - run: npm publish --access public
+      - name: Claude Desktop extension and Figma plugin zip
+        run: npm run bundle
       - name: GitHub release
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag release/figma-mcp-v2.mcpb release/figma-mcp-bridge-plugin.zip
         env:
           GH_TOKEN: ${{ github.token }}

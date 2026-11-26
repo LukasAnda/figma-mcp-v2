@@ -69,10 +69,20 @@ args = ["-y", "figma-mcp-v2"]
 startup_timeout_sec = 120
 ```
 
-### Cursor, Windsurf, Claude Desktop, Cline
+### Claude Desktop
 
-Add this to `.cursor/mcp.json` (Cursor), `~/.codeium/windsurf/mcp_config.json` (Windsurf),
-`claude_desktop_config.json` (Claude Desktop), or the Cline MCP settings:
+Download **[figma-mcp-v2.mcpb](https://github.com/LukasAnda/figma-mcp-v2/releases/latest/download/figma-mcp-v2.mcpb)**
+and double-click it, or use **Settings → Extensions → Install Extension…**. It runs on Claude
+Desktop's built-in Node.js, so you don't need Node, npm or npx. Its settings take an optional
+Figma token for private files.
+
+Claude Desktop also offers Figma's official connector, which needs Dev Mode. If both are enabled
+and Claude reaches for the other one, say "use Figma (no Dev Mode)" or turn the official connector off.
+
+### Cursor, Windsurf, Cline
+
+Add this to `.cursor/mcp.json` (Cursor), `~/.codeium/windsurf/mcp_config.json` (Windsurf) or the
+Cline MCP settings:
 
 ```json
 {
@@ -137,9 +147,14 @@ The environment variables `FIGMA_TOKEN` and `FIGMA_COOKIE` take precedence over 
 Figma's REST API cannot edit layers, so edits go through a small development plugin that runs in
 your own signed-in Figma. You don't share any credentials with the server.
 
-1. Print the plugin's location: `npx -y figma-mcp-v2 plugin`. In a clone it is `plugin/manifest.json`.
+1. Get the plugin onto your computer, in whichever way is easiest:
+   - Ask your AI app to **"install the Figma plugin"**. The `figma_install_plugin` tool copies it to
+     `~/figma-mcp-bridge-plugin` and opens the folder.
+   - Or download **[figma-mcp-bridge-plugin.zip](https://github.com/LukasAnda/figma-mcp-v2/releases/latest/download/figma-mcp-bridge-plugin.zip)** and unzip it somewhere permanent.
+   - Or run `npx -y figma-mcp-v2 plugin install`.
 2. In Figma desktop, right-click the canvas and choose **Plugins → Development → Import plugin from
-   manifest…**, then pick that file. You only need to do this once.
+   manifest…**, then pick `manifest.json` from that folder. You only need to do this once. When the
+   server updates, it refreshes the copy in `~/figma-mcp-bridge-plugin` in place.
 3. In the file you want to edit, run **Plugins → Development → Figma MCP Bridge**. The window
    shows *Connected* while your MCP client is running.
 
@@ -177,6 +192,7 @@ the plugin window whose file matches the link you pass.
 | `figma_create_theme_variant` | Clones screens as another theme. On paid plans it switches the variable mode; on plans with one mode per collection it rebinds every color to a same-named variable in another collection, such as "Tokens Dark". |
 | `figma_anchor_nodes` | Pins existing layers to their parent's edges, for floating buttons, bottom sheets and toasts. |
 | `figma_draw_arrows` | Draws connector arrows between screens or elements. |
+| `figma_install_plugin` | Copies the Figma plugin to `~/figma-mcp-bridge-plugin`, opens the folder, and returns the import steps. |
 | `figma_execute` | Runs Plugin API code for anything the other tools don't cover. Clients that honor tool annotations ask before running it. |
 
 Single-layer tools: `figma_plugin_status`, `figma_get_selection`, `figma_create_node`,

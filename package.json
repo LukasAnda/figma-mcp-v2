@@ -40,7 +40,8 @@
     "test": "node --import tsx --test --test-timeout=30000 test/*.test.ts",
     "smoke": "tsx scripts/smoke.ts",
     "prepare": "tsc",
-    "version": "node scripts/sync-version.mjs && git add .claude-plugin/plugin.json gemini-extension.json src/index.ts plugin/code.js"
+    "version": "node scripts/sync-version.mjs && git add .claude-plugin/plugin.json gemini-extension.json src/version.ts mcpb/manifest.json plugin/code.js",
+    "bundle": "node scripts/build-bundles.mjs"
   },
   "engines": {
     "node": ">=20.3"
@@ -54,6 +55,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^26.6.11",
     "@types/ws": "^8.18.2",

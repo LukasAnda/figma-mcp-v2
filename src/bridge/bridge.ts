@@ -293,6 +293,6 @@ export class Bridge {
 }
 
 export const NOT_CONNECTED =
-  'The Figma plugin is not connected. In Figma desktop: Plugins > Development > Import plugin from manifest... and pick plugin/manifest.json from figma-mcp-v2 (one-time), then run "Figma MCP Bridge" in the file you want to work on.';
+  'The Figma plugin is not connected. If it was never imported, call figma_install_plugin (it copies the plugin and returns the import steps). Otherwise ask the user to run Plugins > Development > Figma MCP Bridge in that file in Figma desktop.';
 
 export const bridge = new Bridge();
