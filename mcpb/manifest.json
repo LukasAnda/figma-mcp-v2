@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "figma-mcp-v2",
   "display_name": "Figma (no Dev Mode)",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Read Figma designs, components, tokens and assets from a link without Dev Mode, and build or edit designs through a companion Figma plugin.",
   "long_description": "Paste a Figma link and Claude can see the design and read its exact specs: layout, spacing, typography, colors, variables, components and assets. Downloading icons and images needs no Dev Mode, no paid seat and, for files shared by link, no token.\n\nWith the companion \"Figma MCP Bridge\" plugin running in Figma desktop, Claude can also build and change designs: whole screens with auto layout, components and variants, design tokens, dark themes, accessibility audits, annotations and Ready for dev status.\n\nTo set up the plugin, say \"set up Figma\". For comments and private files, say \"connect Figma\".",
   "author": {
