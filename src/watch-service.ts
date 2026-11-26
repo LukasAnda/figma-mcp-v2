@@ -11,7 +11,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CREDENTIALS_PATH } from "./auth.js";
 import { parseFigmaUrl } from "./figma/url.js";
-import { VERSION } from "./version.js";
 import { AGENTS, which, type AgentName, type WatchOptions } from "./watch.js";
 
 export const WATCH_DIR = path.join(path.dirname(CREDENTIALS_PATH), "watch");
@@ -49,9 +48,9 @@ export function selfCommand(): { cmd: string; args: string[]; env: Record<string
   const env: Record<string, string> = {};
   if (process.env.ELECTRON_RUN_AS_NODE) env.ELECTRON_RUN_AS_NODE = process.env.ELECTRON_RUN_AS_NODE; // Claude Desktop's built-in Node
   if (entry.includes(`${path.sep}_npx${path.sep}`)) {
-    // npx caches can be cleaned; let npx fetch this exact version again if needed.
+    // Started through npx: services use @latest, and the watcher restarts itself onto new versions.
     const npx = withPath(() => which("npx"));
-    if (npx) return { cmd: npx, args: ["-y", `figma-mcp-v2@${VERSION}`], env };
+    if (npx) return { cmd: npx, args: ["-y", "figma-mcp-v2@latest"], env };
   }
   return { cmd: process.execPath, args: [entry], env };
 }

@@ -13,6 +13,7 @@ import path from "node:path";
 import { CREDENTIALS_PATH, loadStoredCredentials } from "./auth.js";
 import { fixPrompt, isActionable, loadFixRequests, respondToFixRequest, whoAmI, type FixRequest } from "./comments.js";
 import { parseFigmaUrl } from "./figma/url.js";
+import { VERSION } from "./version.js";
 
 export type AgentName = "notify" | "claude" | "gemini" | "codex";
 
@@ -106,6 +107,34 @@ function runAgent(o: WatchOptions, prompt: string, r: FixRequest): Promise<numbe
   });
 }
 
+const newer = (a: string, b: string) => {
+  const pa = a.split(/[.-]/).map(Number), pb = b.split(/[.-]/).map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+};
+
+/**
+ * Background watchers started through npx restart onto new releases: when npm has a newer version,
+ * exit and let launchd/systemd start `figma-mcp-v2@latest` again.
+ */
+function scheduleSelfUpdate(log: (s: string) => void) {
+  const fromNpx = process.argv[1]?.includes(`${path.sep}_npx${path.sep}`);
+  if (!fromNpx || process.platform === "win32") return;
+  const check = async () => {
+    try {
+      const res = await fetch("https://registry.npmjs.org/figma-mcp-v2/latest", { signal: AbortSignal.timeout(15_000) });
+      const latest = ((await res.json()) as { version?: string }).version;
+      if (latest && newer(latest, VERSION)) {
+        log(`figma-mcp-v2 ${latest} is out (running ${VERSION}); restarting onto it`);
+        process.exit(0);
+      }
+    } catch {
+      /* offline: try later */
+    }
+  };
+  setInterval(() => void check(), 3 * 3600_000).unref();
+}
+
 const pidFile = (id: string) => path.join(path.dirname(CREDENTIALS_PATH), "watch", `${id}.pid`);
 
 export async function runWatch(args: string[]): Promise<number> {
@@ -129,6 +158,7 @@ export async function runWatch(args: string[]): Promise<number> {
     mkdirSync(path.dirname(pidFile(o.id)), { recursive: true });
     writeFileSync(pidFile(o.id), String(process.pid));
     process.on("exit", () => rmSync(pidFile(o.id!), { force: true }));
+    scheduleSelfUpdate(log);
   }
   const svc = await import("./watch-service.js");
   process.env.PATH = svc.servicePath();

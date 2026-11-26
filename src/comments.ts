@@ -11,6 +11,9 @@
  *   👀 picked up · ✅ fixed · ❓ needs more information · 👍 acknowledged (no reply needed).
  * A resolved thread is closed. Replies come from FIGMA_BOT_TOKEN's account when set.
  */
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { CREDENTIALS_PATH } from "./auth.js";
 import { figmaGet, figmaSend, type Identity } from "./figma/rest.js";
 import { nodeUrl, type FigmaTarget } from "./figma/url.js";
 
@@ -24,6 +27,34 @@ export interface FigmaComment {
   parent_id?: string;
   client_meta?: { node_id?: string; node_offset?: { x: number; y: number } } | null;
   reactions?: { user: FigmaUser; emoji: string; created_at?: string }[];
+}
+
+/**
+ * Every reply the agent posts starts with this, so its messages are recognised even when it posts
+ * from the same Figma account as the person (the default without a separate bot account).
+ */
+export const AGENT_SIGNATURE = "🤖";
+const POSTED = path.join(path.dirname(CREDENTIALS_PATH), "agent-comments.json");
+
+/** Ids of comments the agent posted from this computer (second check next to the signature). */
+export function postedCommentIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(readFileSync(POSTED, "utf8")) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+function rememberPosted(id: string) {
+  const ids = [...postedCommentIds(), id].slice(-2000);
+  mkdirSync(path.dirname(POSTED), { recursive: true });
+  writeFileSync(POSTED, JSON.stringify(ids));
+}
+
+/** True when replies come from a separate account (FIGMA_BOT_TOKEN differs from the person's token). */
+export function separateBotAccount(): boolean {
+  const bot = process.env.FIGMA_BOT_TOKEN;
+  const user = process.env.FIGMA_TOKEN || process.env.FIGMA_ACCESS_TOKEN || process.env.FIGMA_OAUTH_TOKEN;
+  return !!bot && bot !== user;
 }
 
 export const STATUS_EMOJI = { in_progress: ":eyes:", done: ":white_check_mark:", needs_info: ":question:", acknowledged: ":+1:" } as const;
@@ -60,13 +91,17 @@ export function tagPattern(tag: string): RegExp {
 export function findFixRequests(
   comments: FigmaComment[],
   target: FigmaTarget,
-  opts: { tag: string; botId?: string; authors?: string[] }
+  opts: { tag: string; botId?: string; authors?: string[]; separateBot?: boolean; agentIds?: Set<string> }
 ): FixRequest[] {
   const re = tagPattern(opts.tag);
   const authors = opts.authors?.map((a) => a.toLowerCase());
-  const isAgent = (u: FigmaUser) => !!opts.botId && u.id === opts.botId;
+  // The agent's messages: signed, or remembered as posted here, or (only with a separate bot
+  // account) written by that account. Matching by account alone would swallow the person's own
+  // comments when both share one account.
+  const isAgentMsg = (c: FigmaComment) =>
+    c.message.trimStart().startsWith(AGENT_SIGNATURE) || !!opts.agentIds?.has(c.id) || (!!opts.separateBot && !!opts.botId && c.user.id === opts.botId);
   const allowed = (u: FigmaUser) => !authors || authors.some((a) => [u.id, u.handle.toLowerCase(), u.email?.toLowerCase()].includes(a));
-  const human = (c: FigmaComment) => !isAgent(c.user) && allowed(c.user);
+  const human = (c: FigmaComment) => !isAgentMsg(c) && allowed(c.user);
   const replies = new Map<string, FigmaComment[]>();
   for (const c of comments) if (c.parent_id) replies.set(c.parent_id, [...(replies.get(c.parent_id) ?? []), c]);
   const out: FixRequest[] = [];
@@ -75,7 +110,7 @@ export function findFixRequests(
     // A thread becomes a request thread when an allowed person tags any message in it.
     if (!msgs.some((m) => human(m) && re.test(m.message))) continue;
     const latest = [...msgs].reverse().find(human)!;
-    const agentAfter = msgs.some((m) => isAgent(m.user) && m.created_at > latest.created_at);
+    const agentAfter = msgs.some((m) => isAgentMsg(m) && m.created_at > latest.created_at);
     const mine = (latest.reactions ?? []).filter((r) => !opts.botId || r.user.id === opts.botId).map((r) => r.emoji);
     const status: FixStatus = root.resolved_at
       ? "done"
@@ -99,10 +134,10 @@ export function findFixRequests(
       createdAt: latest.created_at,
       request: latest.message.replace(re, "$1").replace(/\s+/g, " ").trim(),
       status,
-      followUp: msgs.some((m) => isAgent(m.user) && m.created_at < latest.created_at),
+      followUp: msgs.some((m) => isAgentMsg(m) && m.created_at < latest.created_at),
       nodeId,
       link: nodeId ? nodeUrl(target.fileKey, nodeId) : `https://www.figma.com/design/${target.fileKey}?comment=${root.id}`,
-      thread: msgs.map((m) => ({ author: m.user.handle, agent: isAgent(m.user), message: m.message, at: m.created_at }))
+      thread: msgs.map((m) => ({ author: m.user.handle, agent: isAgentMsg(m), message: m.message, at: m.created_at }))
     });
   }
   return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -114,7 +149,10 @@ export const isActionable = (r: FixRequest) => r.status === "open";
 export async function loadFixRequests(target: FigmaTarget, opts: { tag: string; authors?: string[]; signal?: AbortSignal }): Promise<{ requests: FixRequest[]; bot: FigmaUser }> {
   const bot = await whoAmI("bot");
   const res = await figmaGet<{ comments: FigmaComment[] }>(`/v1/files/${target.mainFileKey}/comments`, {}, opts.signal, { cache: false, as: "bot" });
-  return { requests: findFixRequests(res.comments, target, { tag: opts.tag, botId: bot.id, authors: opts.authors }), bot };
+  return {
+    requests: findFixRequests(res.comments, target, { tag: opts.tag, botId: bot.id, authors: opts.authors, separateBot: separateBotAccount(), agentIds: postedCommentIds() }),
+    bot
+  };
 }
 
 /** Replies in the request's thread (as the bot) and sets the status reaction on the request. */
@@ -129,8 +167,10 @@ export async function respondToFixRequest(
   const out: { replied?: string; reaction?: string } = {};
   if (opts.message) {
     // Figma threads are one level deep: replies always point at the top-level comment.
-    const r = await figmaSend<{ id: string }>("POST", `/v1/files/${target.mainFileKey}/comments`, { message: opts.message, comment_id: c.parent_id || c.id }, opts.signal, "bot");
+    const message = opts.message.trimStart().startsWith(AGENT_SIGNATURE) ? opts.message : `${AGENT_SIGNATURE} ${opts.message}`;
+    const r = await figmaSend<{ id: string }>("POST", `/v1/files/${target.mainFileKey}/comments`, { message, comment_id: c.parent_id || c.id }, opts.signal, "bot");
     out.replied = r.id;
+    rememberPosted(r.id);
   }
   if (opts.status) {
     const emoji = STATUS_EMOJI[opts.status];
