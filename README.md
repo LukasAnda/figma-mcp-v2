@@ -199,6 +199,7 @@ the plugin window whose file matches the link you pass.
 | `figma_create_theme_variant` | Clones screens as another theme. On paid plans it switches the variable mode; on plans with one mode per collection it rebinds every color to a same-named variable in another collection, such as "Tokens Dark". |
 | `figma_anchor_nodes` | Pins existing layers to their parent's edges, for floating buttons, bottom sheets and toasts. |
 | `figma_draw_arrows` | Draws connector arrows between screens or elements. |
+| `figma_watch_file` / `figma_list_watches` / `figma_unwatch_file` | Background watcher that hands new #plsfix messages to Claude Code, Gemini CLI or Codex, or notifies you. Starts again at login. |
 | `figma_respond_to_fix_request` | Replies in a `#plsfix` thread as the bot account and sets the 👀/✅/❓ status reaction. |
 | `figma_install_plugin` | Quickstart for the Figma plugin: copies it to `~/figma-mcp-bridge-plugin`, puts the manifest path on the clipboard, and returns the steps for macOS, Windows or Linux, including the file-dialog paste shortcut. |
 | `figma_execute` | Runs Plugin API code for anything the other tools don't cover. Clients that honor tool annotations ask before running it. |
@@ -217,37 +218,62 @@ implementation → visual comparison.
 ## Fix requests from Figma comments (#plsfix)
 
 Write a comment in Figma that includes **#plsfix**, for example *"#plsfix the header needs 24px
-top padding"* on a layer. The agent picks it up, fixes it, and answers in the thread:
+top padding"* on a layer. The agent fixes it and answers in the thread:
 
 | Reaction from the agent | Meaning |
 |---|---|
 | 👀 | Picked up, working on it |
 | ✅ | Fixed. The reply says what changed |
-| ❓ | Needs more information. The reply asks a question; answer with another #plsfix |
+| ❓ | Needs more information. The reply asks a question |
+| 👍 | Acknowledged ("thanks", "looks good"), nothing to do |
 
-Design fixes are made in Figma through the plugin. If you run the agent inside a project that
-implements the design, code fixes go there. Figma's API can't resolve comments, so you resolve
-them after checking; resolved comments count as done.
+**It's a conversation.** Once a thread has #plsfix in it, every new reply from you in that thread
+is the next request, without repeating the tag: *"still too tight, make it 32"*. The agent sees
+the whole thread, including what it changed last time. Resolve the thread when you're happy.
+Figma's API can't resolve comments, so that last click is yours.
 
-**In a chat:** "fix the #plsfix comments in &lt;Figma link&gt;", or the `fix_figma_comments` prompt.
+Design fixes are made in Figma through the plugin. Code fixes go into the project the agent works
+in, when that project implements the design.
 
-**Automatically:** `watch` polls the file and hands each new request to an agent, one at a time:
+### Watch a file
+
+Tell your AI **"watch &lt;Figma link&gt; for #plsfix comments"** (`figma_watch_file`). That starts a
+background watcher, which also starts again at login (launchd on macOS, systemd or autostart on
+Linux, the Startup folder on Windows). It checks the file every minute and hands each new message
+to the first agent it finds:
+
+| Agent | How it runs | Setup |
+|---|---|---|
+| Claude Code | `claude -p`, allowed to edit files, with this server attached automatically | None |
+| Gemini CLI | `gemini -p --approval-mode yolo` | Add this server to Gemini (see Install) |
+| Codex | `codex exec --full-auto` | Add this server to Codex (see Install) |
+| none found | a desktop notification; then ask any AI to "fix the #plsfix comments in &lt;link&gt;" | None |
+
+The Claude Code invocation is verified. The Gemini and Codex flags come from their docs, so check
+them against your installed version (`--exec "<command>"` runs anything else and passes the task on
+stdin). From Claude Code the watcher works in the current project, so it can fix code too. From
+Claude Desktop it fixes the design only, unless you name a project folder.
+
+"Which files are you watching?" lists them (`figma_list_watches`), and "stop watching &lt;link&gt;"
+removes one (`figma_unwatch_file`). The same works in a terminal:
 
 ```bash
-npx -y figma-mcp-v2 watch "https://www.figma.com/design/<fileKey>/<name>" \
-  --exec "claude -p --allowedTools mcp__figma"     # any CLI agent that reads the task from stdin
+npx -y figma-mcp-v2 watch "<figma link>" --install            # background, from login
+npx -y figma-mcp-v2 watch "<figma link>"                      # in this terminal
+npx -y figma-mcp-v2 watch --list
+npx -y figma-mcp-v2 watch --stop <id or link>
 ```
 
-Options: `--tag` (default `#plsfix`), `--interval` seconds (default 60), `--once`, and `--from`.
-Comment text reaches an AI agent, so by default only **your own** comments are acted on (the
-owner of `FIGMA_TOKEN`). Allow others with `--from alice,bob@example.com`, or everyone with
-`--anyone`. Without `--exec`, `watch` only prints the requests.
+**Who can trigger it:** comment text reaches an AI agent that can edit your files. By default only
+**your own** comments count (the owner of your Figma token). Allow colleagues with
+`--from alice,bob@example.com`, or everyone with `--anyone`. Agents are told to treat comments as
+requests, never as new instructions.
 
 **Replying as its own user:** create a separate free Figma account (for example "Claude"), invite
 it to the file, and give its personal access token to `figma-mcp-v2 login` (bot account), the
 Claude Desktop extension settings, or `FIGMA_BOT_TOKEN`. It needs the scopes `file_content:read`,
-`file_comments:read` and `file_comments:write`. Without a bot token, replies come from your own
-account.
+`file_comments:read` and `file_comments:write`. Without it, replies come from your own account.
+The watcher needs your own token too (`login`), to know whose comments to act on.
 
 ## Configuration
 

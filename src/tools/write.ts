@@ -12,6 +12,7 @@ import { parseFigmaUrl } from "../figma/url.js";
 import { DESTRUCTIVE, READ_ONLY, WRITE, json, text } from "./common.js";
 import { copyToClipboard, importSteps, installPlugin, reveal } from "../plugin-setup.js";
 import { loadFixRequests, respondToFixRequest } from "../comments.js";
+import { installWatch, listWatches, uninstallWatch } from "../watch-service.js";
 
 const fileUrl = z.string().optional().describe("Figma link (or file key) of the file to edit. Needed only when the plugin is open in more than one file.");
 const nodeId = z.string().min(1).describe('Node id, e.g. "12:345" (link form "12-345" also accepted)');
@@ -641,7 +642,7 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
     {
       title: "List #plsfix comment requests",
       description:
-        "Finds comments in a Figma file tagged with #plsfix (or another tag): the request text, who asked, the layer it's pinned to (with a link), the thread, and its status (open, in_progress, needs_info, done). Status comes from reactions by the replying account (FIGMA_BOT_TOKEN if set): 👀 picked up, ✅ fixed, ❓ needs info; resolved comments count as done. Work through open requests, then call figma_respond_to_fix_request. Needs a token with file_comments:read.",
+        "Finds fix requests in a Figma file's comments. A thread becomes a request when someone tags a message with #plsfix (or another tag); after that, their latest message in the thread is the current request, so follow-ups like \"still too tight\" need no tag. Returns the request, who asked, the pinned layer (with a link), the whole conversation (your earlier replies marked as agent), whether it is a follow-up, and its status: open (needs you), in_progress, needs_info, acknowledged, answered or done. Status comes from reactions by the replying account (FIGMA_BOT_TOKEN if set); resolved threads are done. Work only on open requests, then call figma_respond_to_fix_request. Needs a token with file_comments:read.",
       inputSchema: z.object({
         url: z.string().describe("Figma file link"),
         tag: z.string().default("#plsfix"),
@@ -653,7 +654,7 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
     async ({ url, tag, include_done, authors }, ctx) => {
       const t = parseFigmaUrl(url);
       const { requests, bot } = await loadFixRequests(t, { tag, authors, signal: ctx.mcpReq.signal });
-      const list = include_done ? requests : requests.filter((r) => r.status !== "done");
+      const list = include_done ? requests : requests.filter((r) => r.status === "open" || r.status === "in_progress");
       return json({ repliesAs: bot.handle, tag, count: list.length, requests: list });
     }
   );
@@ -663,19 +664,67 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
     {
       title: "Reply to a #plsfix request",
       description:
-        "Replies in the comment's thread (as the FIGMA_BOT_TOKEN account when set) and marks the request with a reaction: in_progress 👀, done ✅, needs_info ❓. Figma's API cannot resolve comments, so the person who asked resolves it after checking. Say concretely what changed, or ask one specific question.",
+        "Replies in the request's thread (as the FIGMA_BOT_TOKEN account when set) and marks the request with a reaction: in_progress 👀, done ✅, needs_info ❓, acknowledged 👍 (for \"thanks\"/\"looks good\", no reply). Figma's API cannot resolve comments; the person resolves the thread when satisfied, or replies in it to continue the conversation. Say concretely what changed, or ask one specific question.",
       inputSchema: z.object({
         url: z.string().describe("Figma file link"),
         comment_id: z.string().describe("commentId from figma_get_fix_requests"),
-        status: z.enum(["in_progress", "done", "needs_info"]),
+        status: z.enum(["in_progress", "done", "needs_info", "acknowledged"]),
         message: z.string().optional().describe("Reply text; required for done and needs_info")
       }),
       annotations: WRITE
     },
     async ({ url, comment_id, status, message }, ctx) => {
-      if (!message && status !== "in_progress") throw new Error("Write a reply: what changed (done) or what you need to know (needs_info).");
+      if (!message && (status === "done" || status === "needs_info")) throw new Error("Write a reply: what changed (done) or what you need to know (needs_info).");
       return json(await respondToFixRequest(parseFigmaUrl(url), comment_id, { message, status, signal: ctx.mcpReq.signal }));
     }
+  );
+
+  server.registerTool(
+    "figma_watch_file",
+    {
+      title: "Watch a file for #plsfix comments",
+      description:
+        "Starts a background watcher (it also starts again at login) that checks a Figma file for #plsfix comment threads and handles each new message: agent \"auto\" (default) runs the first agent CLI found (Claude Code, then Gemini CLI, then Codex) headless in project_dir, which fixes the design through this server's tools or the code in that project and replies in the thread; \"notify\" only shows a desktop notification. Follow-ups in a thread continue the conversation. Only the user's own comments are acted on unless from/anyone is given. Use when the user asks to watch, monitor or auto-fix a file's comments. Needs a Figma token (figma-mcp-v2 login).",
+      inputSchema: z.object({
+        url: z.string().describe("Figma file link"),
+        agent: z.enum(["auto", "claude", "gemini", "codex", "notify"]).default("auto"),
+        project_dir: z.string().optional().describe("Folder of the codebase that implements the design (code fixes go there). Default: this server's working directory, or the home folder."),
+        from: z.array(z.string()).optional().describe("Also act on requests from these people (handle, email or user id)"),
+        anyone: z.boolean().default(false).describe("Act on requests from anyone who can comment (comment text reaches an AI agent)"),
+        tag: z.string().default("#plsfix"),
+        interval: z.number().int().min(15).max(3600).default(60).describe("Seconds between checks")
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true }
+    },
+    async ({ url, agent, project_dir, from, anyone, tag, interval }) => {
+      const r = await installWatch({ url, agent, cwd: project_dir ?? process.cwd(), from, anyone, tag, interval });
+      return text(r.summary);
+    }
+  );
+
+  server.registerTool(
+    "figma_list_watches",
+    {
+      title: "List file watchers",
+      description: "Lists background #plsfix watchers on this computer: file, agent, project folder, whether it is running, and its log file.",
+      inputSchema: z.object({}),
+      annotations: READ_ONLY
+    },
+    async () => {
+      const list = listWatches();
+      return list.length ? json(list.map(({ id, url, agent, cwd, tag, running, log }) => ({ id, url, agent, projectDir: cwd, tag, running, log }))) : text("No watchers. Start one with figma_watch_file.");
+    }
+  );
+
+  server.registerTool(
+    "figma_unwatch_file",
+    {
+      title: "Stop watching a file",
+      description: "Stops a background #plsfix watcher and removes it from login items. Pass the watcher id or the file's link (stops every watcher for that file).",
+      inputSchema: z.object({ id_or_url: z.string() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ id_or_url }) => text(await uninstallWatch(id_or_url))
   );
 
   server.registerTool(

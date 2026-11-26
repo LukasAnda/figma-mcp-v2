@@ -26,13 +26,38 @@ test("requests carry status from the bot's reactions, layer links and threads", 
     c("6", me, "not a request")
   ];
   const all = findFixRequests(comments, t, { tag: "#plsfix", botId: "9" });
-  assert.deepEqual(all.map((r) => [r.commentId, r.status]), [["1", "open"], ["3", "done"], ["4", "in_progress"], ["5", "open"]]);
+  // Thread 1: the agent replied after the request, so it waits for the person.
+  assert.deepEqual(all.map((r) => [r.commentId, r.status]), [["1", "answered"], ["3", "done"], ["4", "in_progress"], ["5", "open"]]);
   const first = all[0];
   assert.equal(first.request, "Header too tight");
+  assert.equal(first.thread[1].agent, true);
   assert.equal(first.nodeId, "12:34");
   assert.match(first.link, /node-id=12-34/);
   assert.equal(first.thread.length, 2);
   // Only requests from allowed people.
   const mine = findFixRequests(comments, t, { tag: "#plsfix", botId: "9", authors: ["lukas"] });
   assert.ok(!mine.some((r) => r.author === "client"));
+});
+
+test("a reply in a request thread reopens it as a follow-up, without the tag", () => {
+  const comments = [
+    c("1", me, "#plsfix header needs more padding", { client_meta: { node_id: "1:2" }, reactions: [{ user: bot, emoji: ":white_check_mark:" }] }),
+    c("2", bot, "Done: padding 16 → 24.", { parent_id: "1" }),
+    c("3", me, "still too tight, make it 32", { parent_id: "1" }),
+    c("4", other, "I disagree", { parent_id: "1" })
+  ];
+  const [r] = findFixRequests(comments, t, { tag: "#plsfix", botId: "9", authors: ["1"] });
+  assert.equal(r.commentId, "3"); // latest message from an allowed person; the outsider's reply is context only
+  assert.equal(r.status, "open");
+  assert.equal(r.followUp, true);
+  assert.equal(r.request, "still too tight, make it 32");
+  assert.equal(r.thread.length, 4);
+  // Resolving the thread closes the conversation.
+  comments[0].resolved_at = "2026-11-26T11:00:00Z";
+  assert.equal(findFixRequests(comments, t, { tag: "#plsfix", botId: "9", authors: ["1"] })[0].status, "done");
+});
+
+test("threads without a tag from an allowed person are ignored", () => {
+  const comments = [c("1", other, "#plsfix do something"), c("2", me, "agreed", { parent_id: "1" })];
+  assert.equal(findFixRequests(comments, t, { tag: "#plsfix", botId: "9", authors: ["1"] }).length, 0);
 });

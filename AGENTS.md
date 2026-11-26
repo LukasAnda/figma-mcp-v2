@@ -31,8 +31,10 @@ Run `npm run build && npm test` before finishing a change.
 - `src/plugin-setup.ts`: copies the Figma plugin to a stable folder and refreshes it on updates.
 - `mcpb/`: Claude Desktop extension manifest and icon; `scripts/build-bundles.mjs` packs it with
   production dependencies and resvg binaries for every platform.
-- `src/comments.ts`, `src/watch.ts`: #plsfix fix requests from Figma comments (status via the bot
-  account's reactions; Figma's API can't resolve comments) and the polling `watch` command.
+- `src/comments.ts`: #plsfix threads as conversations (latest human message is the request; status
+  via the bot account's reactions; Figma's API can't resolve comments).
+- `src/watch.ts`: the polling watcher and agent presets (claude/gemini/codex/notify);
+  `src/watch-service.ts`: starts it at login (launchd, systemd/XDG autostart, Windows Startup).
 - `src/tokens/dtcg.ts`: Figma variables -> W3C DTCG 2025.10 token files and resolver.
 - `src/render/`: local SVG renderer and PNG rasterizing in a child process (resvg can panic).
 - `src/bridge/bridge.ts`: WebSocket hub on 127.0.0.1:3055; extra server processes relay through

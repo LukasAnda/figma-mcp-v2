@@ -33,6 +33,7 @@ export function createServer(): McpServer {
       instructions: `Figma tools. Pass Figma links as \`url\` (right-click a layer in Figma > Copy link to selection gives a link with node-id).
 Reading needs no Dev Mode and no token for files shared by link: figma_get_file (pages/frames) → figma_get_design (layout/styles/tokens spec) + figma_get_screenshot (see it) → figma_get_code (starting code) → figma_download_assets (icons/images). figma_get_variables / figma_get_styles / figma_get_components describe the design system.
 Editing needs the "Figma MCP Bridge" plugin running in the file; check with figma_plugin_status.
+Comments: "#plsfix" threads in Figma are fix requests (figma_get_fix_requests / figma_respond_to_fix_request). When the user asks to watch a file or handle its comments automatically, use figma_watch_file.
 First run: if the user has just installed this server, asks how to get started, or wants to edit and figma_plugin_status shows no plugin, call figma_install_plugin and walk them through the numbered steps it returns (the manifest path is already on their clipboard). Mention that reading designs works right away without the plugin. Never edit unless the user asked for changes.
 Building designs: use figma_build_layout to create whole screens in one call (auto layout, components, variants, instances, token bindings, sections, arrows), then check the returned screenshot. Bind colors to variables (figma_bind_tokens) so themes work; figma_create_theme_variant makes dark (or other) variants. Present flows like a design team: one section per flow with a title, per-state headings with requirements, screens, short notes beside them, and arrows for navigation.`
     }
@@ -132,8 +133,20 @@ if (cli === "plugin") {
   process.exit(0);
 }
 if (cli === "watch") {
+  const rest = process.argv.slice(3);
+  if (rest[0] === "--list") {
+    const { listWatches } = await import("./watch-service.js");
+    const list = listWatches();
+    console.log(list.length ? list.map((w) => `${w.id}  ${w.running ? "running" : "stopped"}  ${w.agent}  ${w.url}\n          project ${w.cwd}\n          log ${w.log}`).join("\n") : "No watchers.");
+    process.exit(0);
+  }
+  if (rest[0] === "--stop") {
+    const { uninstallWatch } = await import("./watch-service.js");
+    console.log(await uninstallWatch(rest[1] ?? ""));
+    process.exit(0);
+  }
   const { runWatch } = await import("./watch.js");
-  process.exit(await runWatch(process.argv.slice(3)));
+  process.exit(await runWatch(rest));
 }
 if (cli === "--version" || cli === "-v") {
   console.log(VERSION);
@@ -149,8 +162,10 @@ Usage:
   figma-mcp-v2 logout     remove stored credentials
   figma-mcp-v2 plugin install [dir]   copy the Figma plugin to ~/figma-mcp-bridge-plugin (or dir) and show it
   figma-mcp-v2 plugin     print the path of the bundled Figma plugin manifest
-  figma-mcp-v2 watch <figma link> [--tag #plsfix] [--interval 60] [--from you,colleague] [--exec "claude -p"] [--once]
-                          poll for #plsfix comments and hand each new one to an agent command`);
+  figma-mcp-v2 watch <figma link> [--install] [--agent auto|claude|gemini|codex|notify] [--exec "<cmd>"]
+                     [--tag #plsfix] [--interval 60] [--from you,colleague] [--anyone] [--once]
+                          handle #plsfix comment threads (--install: in the background, from login)
+  figma-mcp-v2 watch --list | --stop <id or link>`);
   process.exit(0);
 }
 
