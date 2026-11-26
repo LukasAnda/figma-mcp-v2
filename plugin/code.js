@@ -19,7 +19,7 @@ function fileInfo() {
     pageName: figma.currentPage.name,
     user: safe(() => (figma.currentUser ? figma.currentUser.name : undefined)),
     editorType: figma.editorType,
-    pluginVersion: "0.1.0"
+    pluginVersion: "0.1.1"
   };
 }
 figma.ui.postMessage({ type: "info", info: fileInfo() });

@@ -23,7 +23,7 @@ import { registerReadTools } from "./tools/read.js";
 import { registerWriteTools } from "./tools/write.js";
 import { closeAllWebSessions } from "./web/client.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 export function createServer(): McpServer {
   const server = new McpServer(
