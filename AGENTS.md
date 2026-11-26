@@ -38,6 +38,17 @@ Run `npm run build && npm test` before finishing a change.
 - `test/`: node:test suites. `plugin-*.test.ts` run `plugin/code.js` in a VM with a mocked
   `figma` global that enforces the auto-layout sizing rules.
 
+## Releasing
+
+```bash
+npm version patch   # or minor / major: bumps package.json and syncs the version into the
+                    # Claude plugin, Gemini extension, server and Figma plugin, then commits and tags
+git push --follow-tags
+```
+
+The `Release` workflow tests and publishes the tag to npm (trusted publishing, with provenance) and
+creates a GitHub release. Never publish from a laptop except for the very first version.
+
 ## Rules
 
 - Never send edits through the web source; it is read-only by design.

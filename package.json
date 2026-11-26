@@ -39,7 +39,8 @@
     "dev": "tsx src/index.ts",
     "test": "node --import tsx --test --test-timeout=30000 test/*.test.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "prepare": "tsc"
+    "prepare": "tsc",
+    "version": "node scripts/sync-version.mjs && git add .claude-plugin/plugin.json gemini-extension.json src/index.ts plugin/code.js"
   },
   "engines": {
     "node": ">=20.3"
