@@ -1,6 +1,6 @@
 {
   "name": "figma-mcp-v2",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP server for AI coding agents: read Figma designs, components, tokens and assets without Dev Mode, and build or edit designs through a companion plugin",
   "keywords": [
     "mcp",
