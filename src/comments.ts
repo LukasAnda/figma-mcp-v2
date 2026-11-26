@@ -34,6 +34,9 @@ export interface FigmaComment {
  * from the same Figma account as the person (the default without a separate bot account).
  */
 export const AGENT_SIGNATURE = "🤖";
+/** Figma stores emoji in comments as shortcodes, so the signature comes back as ":robot_face:". */
+const SIGNED = /^\s*(🤖|:robot_face:)/;
+export const isSigned = (message: string) => SIGNED.test(message);
 const POSTED = path.join(path.dirname(CREDENTIALS_PATH), "agent-comments.json");
 
 /** Ids of comments the agent posted from this computer (second check next to the signature). */
@@ -99,7 +102,7 @@ export function findFixRequests(
   // account) written by that account. Matching by account alone would swallow the person's own
   // comments when both share one account.
   const isAgentMsg = (c: FigmaComment) =>
-    c.message.trimStart().startsWith(AGENT_SIGNATURE) || !!opts.agentIds?.has(c.id) || (!!opts.separateBot && !!opts.botId && c.user.id === opts.botId);
+    isSigned(c.message) || !!opts.agentIds?.has(c.id) || (!!opts.separateBot && !!opts.botId && c.user.id === opts.botId);
   const allowed = (u: FigmaUser) => !authors || authors.some((a) => [u.id, u.handle.toLowerCase(), u.email?.toLowerCase()].includes(a));
   const human = (c: FigmaComment) => !isAgentMsg(c) && allowed(c.user);
   const replies = new Map<string, FigmaComment[]>();
@@ -167,7 +170,7 @@ export async function respondToFixRequest(
   const out: { replied?: string; reaction?: string } = {};
   if (opts.message) {
     // Figma threads are one level deep: replies always point at the top-level comment.
-    const message = opts.message.trimStart().startsWith(AGENT_SIGNATURE) ? opts.message : `${AGENT_SIGNATURE} ${opts.message}`;
+    const message = isSigned(opts.message) ? opts.message : `${AGENT_SIGNATURE} ${opts.message}`;
     const r = await figmaSend<{ id: string }>("POST", `/v1/files/${target.mainFileKey}/comments`, { message, comment_id: c.parent_id || c.id }, opts.signal, "bot");
     out.replied = r.id;
     rememberPosted(r.id);

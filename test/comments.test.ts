@@ -73,6 +73,9 @@ test("one shared account: the person's comments are requests, signed replies are
   const r = findFixRequests(comments, t, { tag: "#plsfix", botId: "1", authors: ["1"] });
   assert.deepEqual(r.map((x) => [x.commentId, x.status, x.followUp]), [["3", "open", true], ["4", "open", false]]);
   assert.deepEqual(r[0].thread.map((m) => m.agent), [false, true, false]);
+  // Figma returns the emoji as a shortcode; that's still the agent's signature.
+  const shortcode = [c("1", me, "#plsfix spacing"), c("2", me, ":robot_face: Done.", { parent_id: "1" })];
+  assert.equal(findFixRequests(shortcode, t, { tag: "#plsfix", botId: "1", authors: ["1"] })[0].status, "answered");
   // A reply remembered as posted by the agent counts as the agent's even without the signature.
   const old = [c("1", me, "#plsfix spacing"), c("2", me, "Done.", { parent_id: "1" })];
   assert.equal(findFixRequests(old, t, { tag: "#plsfix", botId: "1", authors: ["1"], agentIds: new Set(["2"]) })[0].status, "answered");
