@@ -21,3 +21,11 @@ test("plugin install copies files, records the folder and refreshes outdated cop
   assert.equal(readFileSync(path.join(dir, ".figma-mcp-v2-version"), "utf8").trim(), VERSION);
   assert.notEqual(readFileSync(path.join(dir, "code.js"), "utf8"), "old");
 });
+
+test("quickstart steps use each OS's file-dialog paste shortcut", async () => {
+  const { importSteps } = await import("../src/plugin-setup.js");
+  assert.match(importSteps("/p/manifest.json", true, "darwin")[2], /⌘⇧G, paste with ⌘V/);
+  assert.match(importSteps("C:\\p\\manifest.json", true, "win32")[2], /"File name" box, paste with Ctrl\+V/);
+  assert.match(importSteps("/p/manifest.json", true, "linux")[2], /Ctrl\+L, paste with Ctrl\+V/);
+  assert.match(importSteps("/p/manifest.json", false, "linux")[2], /\/p\/manifest\.json/);
+});

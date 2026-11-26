@@ -3,7 +3,8 @@
 //   figma-mcp-bridge-plugin.zip  the Figma plugin, ready for Plugins > Development > Import plugin from manifest
 // Usage: npm run build && npm run bundle
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const root = process.cwd();
@@ -36,7 +37,34 @@ rmSync(path.join(stage, "package-lock.json"));
 // 2. Pack and validate the extension.
 const mcpb = path.join(root, "node_modules/.bin/mcpb");
 run(mcpb, ["validate", path.join(stage, "manifest.json")]);
-run(mcpb, ["pack", stage, path.join(out, `${pkg.name}.mcpb`)]);
+const bundle = path.join(out, `${pkg.name}.mcpb`);
+run(mcpb, ["pack", stage, bundle]);
+
+// Optional signing. MCPB_SIGNING_CERT / MCPB_SIGNING_KEY hold PEM text (a code-signing certificate
+// and its private key); MCPB_SIGNING_CHAIN optionally holds the intermediate certificates.
+if (process.env.MCPB_SIGNING_CERT && process.env.MCPB_SIGNING_KEY) {
+  const keys = mkdtempSync(path.join(os.tmpdir(), "mcpb-sign-"));
+  try {
+    const cert = path.join(keys, "cert.pem"), key = path.join(keys, "key.pem"), chain = path.join(keys, "chain.pem");
+    writeFileSync(cert, process.env.MCPB_SIGNING_CERT, { mode: 0o600 });
+    writeFileSync(key, process.env.MCPB_SIGNING_KEY, { mode: 0o600 });
+    const args = ["sign", bundle, "--cert", cert, "--key", key];
+    if (process.env.MCPB_SIGNING_CHAIN) {
+      writeFileSync(chain, process.env.MCPB_SIGNING_CHAIN, { mode: 0o600 });
+      args.push("--intermediate", chain);
+    }
+    run(mcpb, args);
+    // verify checks the chain against this machine's trust store: a self-signed or untrusted
+    // certificate signs fine but reports "not signed". Report it without failing the release.
+    try {
+      run(mcpb, ["verify", bundle]);
+    } catch {
+      console.warn("WARNING: the extension is signed, but its certificate isn't trusted here (self-signed or unknown issuer).");
+    }
+  } finally {
+    rmSync(keys, { recursive: true, force: true });
+  }
+} else console.log("MCPB_SIGNING_CERT/MCPB_SIGNING_KEY not set: the extension is unsigned.");
 
 // 3. The Figma plugin as a zip with one folder inside.
 const pluginStage = path.join(out, "plugin-stage", "figma-mcp-bridge-plugin");

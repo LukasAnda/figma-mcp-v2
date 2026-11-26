@@ -30,6 +30,11 @@ jobs:
       - run: npm publish --access public
       - name: Claude Desktop extension and Figma plugin zip
         run: npm run bundle
+        env:
+          # Optional: a code-signing certificate makes Claude Desktop show the extension as verified.
+          MCPB_SIGNING_CERT: ${{ secrets.MCPB_SIGNING_CERT }}
+          MCPB_SIGNING_KEY: ${{ secrets.MCPB_SIGNING_KEY }}
+          MCPB_SIGNING_CHAIN: ${{ secrets.MCPB_SIGNING_CHAIN }}
       - name: GitHub release
         run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag release/figma-mcp-v2.mcpb release/figma-mcp-bridge-plugin.zip
         env:

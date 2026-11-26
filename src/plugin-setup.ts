@@ -71,12 +71,49 @@ export function reveal(file: string): boolean {
   }
 }
 
-export function importSteps(manifest: string): string[] {
+function pipeTo(cmd: string, args: string[], input: string, env?: NodeJS.ProcessEnv): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const p = spawn(cmd, args, { stdio: ["pipe", "ignore", "ignore"], env: env ?? process.env });
+      p.on("error", () => resolve(false));
+      p.on("close", (code) => resolve(code === 0));
+      p.stdin.end(input);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/** Copies text to the system clipboard on macOS, Windows and Linux (Wayland or X11). */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (process.platform === "darwin") return pipeTo("pbcopy", [], text);
+  if (process.platform === "win32") {
+    // PowerShell keeps non-ASCII paths intact (clip.exe would mangle "C:\Users\Lukáš").
+    return pipeTo("powershell", ["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -Value $env:FIGMA_MCP_CLIP"], "", { ...process.env, FIGMA_MCP_CLIP: text });
+  }
+  for (const [cmd, args] of [["wl-copy", []], ["xclip", ["-selection", "clipboard"]], ["xsel", ["--clipboard", "--input"]]] as [string, string[]][]) {
+    if (await pipeTo(cmd, args, text)) return true;
+  }
+  return false;
+}
+
+/** Quickstart for "Import plugin from manifest", with the file dialog's paste shortcut for this OS. */
+export function importSteps(manifest: string, copied = false, platform: NodeJS.Platform = process.platform): string[] {
+  const paste =
+    platform === "darwin"
+      ? `press ⌘⇧G, paste with ⌘V, press Return, then click Open`
+      : platform === "win32"
+        ? `click the "File name" box, paste with Ctrl+V and press Enter`
+        : `press Ctrl+L, paste with Ctrl+V and press Enter`;
   return [
-    "Open the Figma desktop app (browser Figma can't load development plugins).",
+    platform === "linux"
+      ? "Open Figma's desktop app (Figma has no official Linux app; the community figma-linux app works). The browser version can't load development plugins."
+      : "Open the Figma desktop app (the browser version can't load development plugins) and open any design file.",
     "Right-click the canvas > Plugins > Development > Import plugin from manifest…",
-    `Choose ${manifest}` + (process.platform === "darwin" ? " (in the file dialog, ⌘⇧G and paste the path)." : "."),
-    "Then in the file you want to work on: Plugins > Development > Figma MCP Bridge. Its window says Connected.",
-    "The import is one-time; updates of this server refresh the plugin files in place."
+    copied
+      ? `The path to manifest.json is already on your clipboard. In the file dialog, ${paste}.`
+      : `In the file dialog, ${paste} with this path: ${manifest}`,
+    "In the file you want to work on: right-click > Plugins > Development > Figma MCP Bridge. Its window says Connected.",
+    "That's it. The import is one-time; updates refresh the plugin files in place."
   ];
 }

@@ -16,16 +16,22 @@ export class FigmaApiError extends Error {
   }
 }
 
-function authHeaders(): Record<string, string> {
-  const pat = process.env.FIGMA_TOKEN ?? process.env.FIGMA_ACCESS_TOKEN ?? process.env.FIGMA_API_KEY;
+/** "user" acts as the person (FIGMA_TOKEN); "bot" uses FIGMA_BOT_TOKEN when set, e.g. a separate
+ * Figma account that replies to comments under its own name, and falls back to the user's token. */
+export type Identity = "user" | "bot";
+
+function authHeaders(as: Identity = "user"): Record<string, string> {
+  const bot = process.env.FIGMA_BOT_TOKEN;
+  if (as === "bot" && bot) return { "X-Figma-Token": bot };
+  const pat = process.env.FIGMA_TOKEN || process.env.FIGMA_ACCESS_TOKEN || process.env.FIGMA_API_KEY;
   const oauth = process.env.FIGMA_OAUTH_TOKEN;
   if (oauth) return { Authorization: `Bearer ${oauth}` };
   if (pat) return { "X-Figma-Token": pat };
   return {};
 }
 
-export function hasRestAuth(): boolean {
-  return Object.keys(authHeaders()).length > 0;
+export function hasRestAuth(as: Identity = "user"): boolean {
+  return Object.keys(authHeaders(as)).length > 0;
 }
 
 function errorMessage(status: number, body: string, path: string): string {
@@ -60,9 +66,9 @@ export async function figmaGet<T>(
   path: string,
   params: Record<string, string | number | boolean | undefined> = {},
   signal?: AbortSignal,
-  opts: { cache?: boolean } = {}
+  opts: { cache?: boolean; as?: Identity } = {}
 ): Promise<T> {
-  if (!hasRestAuth()) {
+  if (!hasRestAuth(opts.as)) {
     throw new FigmaApiError(
       401,
       "No Figma token configured. Set FIGMA_TOKEN (Figma > Settings > Security > Personal access tokens, scope file_content:read) in the MCP server env, or connect the companion plugin to read through it."
@@ -70,7 +76,7 @@ export async function figmaGet<T>(
   }
   const url = new URL(path, API_BASE);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
-  const key = url.toString();
+  const key = (opts.as ?? "user") + " " + url.toString();
   const useCache = opts.cache !== false;
   const hit = cache.get(key);
   if (useCache && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as T;
@@ -80,7 +86,7 @@ export async function figmaGet<T>(
     if (signal) signals.push(signal);
     let res: Response;
     try {
-      res = await fetch(url, { headers: { ...authHeaders(), Accept: "application/json" }, signal: AbortSignal.any(signals) });
+      res = await fetch(url, { headers: { ...authHeaders(opts.as), Accept: "application/json" }, signal: AbortSignal.any(signals) });
     } catch (e) {
       if (e instanceof DOMException && e.name === "TimeoutError") {
         throw new Error(`Figma did not respond within ${TIMEOUT_MS / 1000}s. Large files are slow: pass a node link or a smaller depth.`);
@@ -99,11 +105,11 @@ export async function figmaGet<T>(
   }
 }
 
-export async function figmaSend<T>(method: "POST" | "DELETE" | "PUT", path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  if (!hasRestAuth()) throw new FigmaApiError(401, "No Figma token configured. Set FIGMA_TOKEN in the MCP server env.");
+export async function figmaSend<T>(method: "POST" | "DELETE" | "PUT", path: string, body: unknown, signal?: AbortSignal, as: Identity = "user"): Promise<T> {
+  if (!hasRestAuth(as)) throw new FigmaApiError(401, "No Figma token configured. Set FIGMA_TOKEN (or FIGMA_BOT_TOKEN for replies) in the MCP server env.");
   const res = await fetch(new URL(path, API_BASE), {
     method,
-    headers: { ...authHeaders(), "Content-Type": "application/json", Accept: "application/json" },
+    headers: { ...authHeaders(as), "Content-Type": "application/json", Accept: "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS)
   });

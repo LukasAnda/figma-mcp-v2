@@ -16,6 +16,9 @@ import readline from "node:readline";
 export interface Credentials {
   token?: string;
   cookie?: string;
+  /** Token of a separate Figma account that replies to #plsfix comments under its own name. */
+  botToken?: string;
+  bot?: string;
   user?: string;
   savedAt?: string;
 }
@@ -28,6 +31,7 @@ export function loadStoredCredentials(): Credentials {
     const c = JSON.parse(readFileSync(CREDENTIALS_PATH, "utf8")) as Credentials;
     if (c.token && !process.env.FIGMA_TOKEN && !process.env.FIGMA_ACCESS_TOKEN && !process.env.FIGMA_OAUTH_TOKEN) process.env.FIGMA_TOKEN = c.token;
     if (c.cookie && !process.env.FIGMA_COOKIE) process.env.FIGMA_COOKIE = c.cookie;
+    if (c.botToken && !process.env.FIGMA_BOT_TOKEN) process.env.FIGMA_BOT_TOKEN = c.botToken;
     return c;
   } catch {
     return {};
@@ -78,7 +82,7 @@ export async function runAuthCli(cmd: string): Promise<number> {
     } catch {
       /* none */
     }
-    log(`Stored credentials (${CREDENTIALS_PATH}): ${c.token ? `token for ${c.user ?? "?"}` : "no token"}, ${c.cookie ? "cookie set" : "no cookie"}.`);
+    log(`Stored credentials (${CREDENTIALS_PATH}): ${c.token ? `token for ${c.user ?? "?"}` : "no token"}, ${c.cookie ? "cookie set" : "no cookie"}, ${c.botToken ? `bot account ${c.bot ?? "?"}` : "no bot account"}.`);
     log(`Environment: FIGMA_TOKEN ${process.env.FIGMA_TOKEN ? "set" : "unset"}, FIGMA_COOKIE ${process.env.FIGMA_COOKIE ? "set" : "unset"}.`);
     log("Without either, only files shared as \"anyone with the link can view\" can be read.");
     return 0;
@@ -86,7 +90,7 @@ export async function runAuthCli(cmd: string): Promise<number> {
   // login
   log("Log in to Figma for figma-mcp-v2.\n");
   log("1) Personal access token (recommended): Figma > Settings > Security > Personal access tokens.");
-  log("   Scopes: file_content:read (plus file_comments:write to post comments, file_variables:read on Enterprise).");
+  log("   Scopes: file_content:read (plus file_comments:read/write for #plsfix comments, file_variables:read on Enterprise).");
   log("2) Browser cookie (optional, lets the no-token web source open private files): copy the `cookie` request header");
   log("   from any figma.com request in your browser's dev tools.\n");
   const current = loadStoredCredentials();
@@ -99,7 +103,15 @@ export async function runAuthCli(cmd: string): Promise<number> {
   }
   const cookie = await ask("figma.com cookie (Enter to skip): ", true);
   if (cookie) next.cookie = cookie;
-  if (!token && !cookie) {
+  log("\n3) Bot account token (optional): a personal access token of a separate Figma account (e.g. \"Claude\"),");
+  log("   invited to your files, so replies to #plsfix comments appear under its own name. Scopes: file_content:read, file_comments:write.");
+  const botToken = await ask("Bot account token (Enter to skip): ", true);
+  if (botToken) {
+    next.bot = await whoAmI(botToken);
+    next.botToken = botToken;
+    log(`Bot token OK — replies will come from ${next.bot}.`);
+  }
+  if (!token && !cookie && !botToken) {
     log("Nothing entered; credentials unchanged.");
     return 1;
   }

@@ -76,6 +76,10 @@ and double-click it, or use **Settings → Extensions → Install Extension…**
 Desktop's built-in Node.js, so you don't need Node, npm or npx. Its settings take an optional
 Figma token for private files.
 
+After installing, say **"set up Figma"**, or pick the *quickstart* prompt. Claude installs the
+Figma plugin, puts its path on your clipboard and walks you through the three clicks. Reading
+designs works right away; the plugin is only needed for editing.
+
 Claude Desktop also offers Figma's official connector, which needs Dev Mode. If both are enabled
 and Claude reaches for the other one, say "use Figma (no Dev Mode)" or turn the official connector off.
 
@@ -148,12 +152,14 @@ Figma's REST API cannot edit layers, so edits go through a small development plu
 your own signed-in Figma. You don't share any credentials with the server.
 
 1. Get the plugin onto your computer, in whichever way is easiest:
-   - Ask your AI app to **"install the Figma plugin"**. The `figma_install_plugin` tool copies it to
-     `~/figma-mcp-bridge-plugin` and opens the folder.
+   - Ask your AI app to **"set up Figma"**. The `figma_install_plugin` tool copies the plugin to
+     `~/figma-mcp-bridge-plugin`, puts the manifest path on your clipboard, and tells you where to
+     paste it.
    - Or download **[figma-mcp-bridge-plugin.zip](https://github.com/LukasAnda/figma-mcp-v2/releases/latest/download/figma-mcp-bridge-plugin.zip)** and unzip it somewhere permanent.
    - Or run `npx -y figma-mcp-v2 plugin install`.
 2. In Figma desktop, right-click the canvas and choose **Plugins → Development → Import plugin from
-   manifest…**, then pick `manifest.json` from that folder. You only need to do this once. When the
+   manifest…**. In the file dialog, paste the path: **⌘⇧G, ⌘V, Return** on macOS; click the
+   **File name** box, then **Ctrl+V, Enter** on Windows; **Ctrl+L, Ctrl+V, Enter** on Linux. You only need to do this once. When the
    server updates, it refreshes the copy in `~/figma-mcp-bridge-plugin` in place.
 3. In the file you want to edit, run **Plugins → Development → Figma MCP Bridge**. The window
    shows *Connected* while your MCP client is running.
@@ -178,6 +184,7 @@ the plugin window whose file matches the link you pass.
 | `figma_get_variables` | Collections, modes and per-mode values, with aliases resolved by name. |
 | `figma_get_styles` | Color, text, effect and grid styles with their values. |
 | `figma_get_comments` | File comments (needs `FIGMA_TOKEN`). |
+| `figma_get_fix_requests` | Open `#plsfix` comments: the request, who asked, the linked layer, the thread and the status. |
 | `figma_export_tokens` | Variables as W3C Design Tokens (DTCG format 2025.10): one `.tokens.json` per collection and mode, plus a `.resolver.json` that switches themes. The output validates against the official schemas. Feed it to Style Dictionary to generate CSS, Swift or Kotlin. |
 
 ### Building and editing (via the plugin)
@@ -192,7 +199,8 @@ the plugin window whose file matches the link you pass.
 | `figma_create_theme_variant` | Clones screens as another theme. On paid plans it switches the variable mode; on plans with one mode per collection it rebinds every color to a same-named variable in another collection, such as "Tokens Dark". |
 | `figma_anchor_nodes` | Pins existing layers to their parent's edges, for floating buttons, bottom sheets and toasts. |
 | `figma_draw_arrows` | Draws connector arrows between screens or elements. |
-| `figma_install_plugin` | Copies the Figma plugin to `~/figma-mcp-bridge-plugin`, opens the folder, and returns the import steps. |
+| `figma_respond_to_fix_request` | Replies in a `#plsfix` thread as the bot account and sets the 👀/✅/❓ status reaction. |
+| `figma_install_plugin` | Quickstart for the Figma plugin: copies it to `~/figma-mcp-bridge-plugin`, puts the manifest path on the clipboard, and returns the steps for macOS, Windows or Linux, including the file-dialog paste shortcut. |
 | `figma_execute` | Runs Plugin API code for anything the other tools don't cover. Clients that honor tool annotations ask before running it. |
 
 Single-layer tools: `figma_plugin_status`, `figma_get_selection`, `figma_create_node`,
@@ -206,11 +214,47 @@ Single-layer tools: `figma_plugin_status`, `figma_get_selection`, `figma_create_
 **Prompt:** `implement_figma_design(url, notes?)` walks the agent through screenshot → spec → assets →
 implementation → visual comparison.
 
+## Fix requests from Figma comments (#plsfix)
+
+Write a comment in Figma that includes **#plsfix**, for example *"#plsfix the header needs 24px
+top padding"* on a layer. The agent picks it up, fixes it, and answers in the thread:
+
+| Reaction from the agent | Meaning |
+|---|---|
+| 👀 | Picked up, working on it |
+| ✅ | Fixed. The reply says what changed |
+| ❓ | Needs more information. The reply asks a question; answer with another #plsfix |
+
+Design fixes are made in Figma through the plugin. If you run the agent inside a project that
+implements the design, code fixes go there. Figma's API can't resolve comments, so you resolve
+them after checking; resolved comments count as done.
+
+**In a chat:** "fix the #plsfix comments in &lt;Figma link&gt;", or the `fix_figma_comments` prompt.
+
+**Automatically:** `watch` polls the file and hands each new request to an agent, one at a time:
+
+```bash
+npx -y figma-mcp-v2 watch "https://www.figma.com/design/<fileKey>/<name>" \
+  --exec "claude -p --allowedTools mcp__figma"     # any CLI agent that reads the task from stdin
+```
+
+Options: `--tag` (default `#plsfix`), `--interval` seconds (default 60), `--once`, and `--from`.
+Comment text reaches an AI agent, so by default only **your own** comments are acted on (the
+owner of `FIGMA_TOKEN`). Allow others with `--from alice,bob@example.com`, or everyone with
+`--anyone`. Without `--exec`, `watch` only prints the requests.
+
+**Replying as its own user:** create a separate free Figma account (for example "Claude"), invite
+it to the file, and give its personal access token to `figma-mcp-v2 login` (bot account), the
+Claude Desktop extension settings, or `FIGMA_BOT_TOKEN`. It needs the scopes `file_content:read`,
+`file_comments:read` and `file_comments:write`. Without a bot token, replies come from your own
+account.
+
 ## Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `FIGMA_TOKEN` | – | Personal access token (REST source, comments, private files) |
+| `FIGMA_BOT_TOKEN` | – | Token of a separate Figma account that replies to #plsfix comments |
 | `FIGMA_COOKIE` | – | figma.com cookie, for private files through the web source |
 | `FIGMA_SOURCE` | auto | Force `web`, `rest` or `plugin` |
 | `FIGMA_ASSETS_DIR` | `figma-assets` | Default output folder for `figma_download_assets` |

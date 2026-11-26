@@ -31,6 +31,8 @@ Run `npm run build && npm test` before finishing a change.
 - `src/plugin-setup.ts`: copies the Figma plugin to a stable folder and refreshes it on updates.
 - `mcpb/`: Claude Desktop extension manifest and icon; `scripts/build-bundles.mjs` packs it with
   production dependencies and resvg binaries for every platform.
+- `src/comments.ts`, `src/watch.ts`: #plsfix fix requests from Figma comments (status via the bot
+  account's reactions; Figma's API can't resolve comments) and the polling `watch` command.
 - `src/tokens/dtcg.ts`: Figma variables -> W3C DTCG 2025.10 token files and resolver.
 - `src/render/`: local SVG renderer and PNG rasterizing in a child process (resvg can panic).
 - `src/bridge/bridge.ts`: WebSocket hub on 127.0.0.1:3055; extra server processes relay through
@@ -52,6 +54,12 @@ git push --follow-tags
 The `Release` workflow tests and publishes the tag to npm (trusted publishing, with provenance),
 builds the Claude Desktop extension (`figma-mcp-v2.mcpb`) and the Figma plugin zip with
 `npm run bundle`, and attaches both to a GitHub release. Never publish from a laptop except for the very first version.
+
+Signing the Claude Desktop extension is optional. When the repository secrets `MCPB_SIGNING_CERT`
+and `MCPB_SIGNING_KEY` (PEM text, plus `MCPB_SIGNING_CHAIN` for intermediates) are set, the
+release runs `mcpb sign` and `mcpb verify`. Claude Desktop treats a bundle as verified only when
+the certificate chains to a root in the OS trust store; a self-signed certificate signs but shows
+as unverified.
 
 ## Rules
 

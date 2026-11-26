@@ -10,7 +10,8 @@ import { NOT_CONNECTED, bridge } from "../bridge/bridge.js";
 import { figmaSend } from "../figma/rest.js";
 import { parseFigmaUrl } from "../figma/url.js";
 import { DESTRUCTIVE, READ_ONLY, WRITE, json, text } from "./common.js";
-import { importSteps, installPlugin, reveal } from "../plugin-setup.js";
+import { copyToClipboard, importSteps, installPlugin, reveal } from "../plugin-setup.js";
+import { loadFixRequests, respondToFixRequest } from "../comments.js";
 
 const fileUrl = z.string().optional().describe("Figma link (or file key) of the file to edit. Needed only when the plugin is open in more than one file.");
 const nodeId = z.string().min(1).describe('Node id, e.g. "12:345" (link form "12-345" also accepted)');
@@ -51,20 +52,24 @@ export function registerWriteTools(server: McpServer) {
   server.registerTool(
     "figma_install_plugin",
     {
-      title: "Install the Figma plugin",
+      title: "Install the Figma plugin (quickstart)",
       description:
-        "Copies the companion \"Figma MCP Bridge\" plugin (needed for every editing tool) to a stable folder on this computer, shows it in Finder/Explorer, and returns the import steps for the user. Use it when figma_plugin_status reports no plugin and the user hasn't imported it yet. Later server updates refresh the copied files automatically.",
+        "Sets up the companion \"Figma MCP Bridge\" plugin, which every editing tool needs: copies it to a stable folder (~/figma-mcp-bridge-plugin), puts the manifest path on the clipboard, and returns the steps for this OS, including the file-dialog paste shortcut. Relay the steps to the user word for word as a numbered list. Use it right after this server is installed, when the user asks how to set up editing, or when figma_plugin_status reports no plugin.",
       inputSchema: z.object({
         dir: z.string().optional().describe("Target folder (default ~/figma-mcp-bridge-plugin)"),
-        reveal: z.boolean().default(true).describe("Open the folder in Finder/Explorer")
+        copy_path: z.boolean().default(true).describe("Put the manifest path on the clipboard"),
+        reveal: z.boolean().default(false).describe("Also open the folder in Finder/Explorer")
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
-    async ({ dir, reveal: show }) => {
+    async ({ dir, copy_path, reveal: show }) => {
       const r = await installPlugin(dir);
+      const copied = copy_path ? await copyToClipboard(r.manifest) : false;
       if (show) reveal(r.manifest);
       return text(
-        `Figma plugin ${r.version} ${r.updated ? "updated" : "installed"} in ${r.dir}.\n\nTell the user:\n` + importSteps(r.manifest).map((s, i) => `${i + 1}. ${s}`).join("\n")
+        `Figma plugin ${r.version} ${r.updated ? "updated" : "installed"} in ${r.dir}${copied ? " (manifest path copied to the clipboard)" : ""}.\n\nShow the user these steps:\n` +
+          importSteps(r.manifest, copied).map((s, i) => `${i + 1}. ${s}`).join("\n") +
+          `\n\nManifest: ${r.manifest}`
       );
     }
   );
@@ -631,6 +636,48 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
   );
 
   // REST write: comments do not need the plugin.
+  server.registerTool(
+    "figma_get_fix_requests",
+    {
+      title: "List #plsfix comment requests",
+      description:
+        "Finds comments in a Figma file tagged with #plsfix (or another tag): the request text, who asked, the layer it's pinned to (with a link), the thread, and its status (open, in_progress, needs_info, done). Status comes from reactions by the replying account (FIGMA_BOT_TOKEN if set): 👀 picked up, ✅ fixed, ❓ needs info; resolved comments count as done. Work through open requests, then call figma_respond_to_fix_request. Needs a token with file_comments:read.",
+      inputSchema: z.object({
+        url: z.string().describe("Figma file link"),
+        tag: z.string().default("#plsfix"),
+        include_done: z.boolean().default(false),
+        authors: z.array(z.string()).optional().describe("Only requests by these people (handle, email or user id). Recommended when the file has outside commenters.")
+      }),
+      annotations: READ_ONLY
+    },
+    async ({ url, tag, include_done, authors }, ctx) => {
+      const t = parseFigmaUrl(url);
+      const { requests, bot } = await loadFixRequests(t, { tag, authors, signal: ctx.mcpReq.signal });
+      const list = include_done ? requests : requests.filter((r) => r.status !== "done");
+      return json({ repliesAs: bot.handle, tag, count: list.length, requests: list });
+    }
+  );
+
+  server.registerTool(
+    "figma_respond_to_fix_request",
+    {
+      title: "Reply to a #plsfix request",
+      description:
+        "Replies in the comment's thread (as the FIGMA_BOT_TOKEN account when set) and marks the request with a reaction: in_progress 👀, done ✅, needs_info ❓. Figma's API cannot resolve comments, so the person who asked resolves it after checking. Say concretely what changed, or ask one specific question.",
+      inputSchema: z.object({
+        url: z.string().describe("Figma file link"),
+        comment_id: z.string().describe("commentId from figma_get_fix_requests"),
+        status: z.enum(["in_progress", "done", "needs_info"]),
+        message: z.string().optional().describe("Reply text; required for done and needs_info")
+      }),
+      annotations: WRITE
+    },
+    async ({ url, comment_id, status, message }, ctx) => {
+      if (!message && status !== "in_progress") throw new Error("Write a reply: what changed (done) or what you need to know (needs_info).");
+      return json(await respondToFixRequest(parseFigmaUrl(url), comment_id, { message, status, signal: ctx.mcpReq.signal }));
+    }
+  );
+
   server.registerTool(
     "figma_post_comment",
     {
