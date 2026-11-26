@@ -1,0 +1,12 @@
+{
+  "name": "figma-mcp-v2",
+  "version": "0.1.0",
+  "description": "Read Figma designs, components, tokens and assets without Dev Mode, and build or edit designs through a companion plugin.",
+  "contextFileName": "CONTEXT.md",
+  "mcpServers": {
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "github:LukasAnda/figma-mcp-v2"]
+    }
+  }
+}

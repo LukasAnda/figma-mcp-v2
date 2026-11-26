@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; font: 12px/1.4 Inter, system-ui, sans-serif; }
+  body { margin: 0; padding: 12px; background: var(--figma-color-bg, #fff); color: var(--figma-color-text, #222); }
+  .row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #c33; flex: none; }
+  .dot.on { background: #1a9e55; }
+  input { width: 60px; padding: 3px 5px; }
+  button { padding: 4px 10px; }
+  #log { height: 96px; overflow: auto; font-family: ui-monospace, monospace; font-size: 10px; opacity: .8; white-space: pre-wrap; border-top: 1px solid rgba(127,127,127,.3); padding-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="row"><span id="dot" class="dot"></span><strong id="status">Connecting…</strong></div>
+  <div class="row">Port <input id="port" value="3055" /> <button id="reconnect">Reconnect</button></div>
+  <div id="log"></div>
+<script>
+  let ws, info = null, retry = 0, timer;
+  const $ = (id) => document.getElementById(id);
+  const log = (m) => { const el = $("log"); el.textContent = (new Date().toLocaleTimeString() + " " + m + "\n" + el.textContent).slice(0, 4000); };
+  const setStatus = (on, text) => { $("dot").className = "dot" + (on ? " on" : ""); $("status").textContent = text; };
+
+  function connect() {
+    clearTimeout(timer);
+    try { ws && ws.close(); } catch (e) {}
+    const port = Number($("port").value) || 3055;
+    ws = new WebSocket("ws://localhost:" + port);
+    ws.onopen = () => {
+      retry = 0;
+      setStatus(true, "Connected to MCP server");
+      if (info) ws.send(JSON.stringify({ type: "hello", role: "plugin", info }));
+    };
+    ws.onclose = () => {
+      setStatus(false, "Not connected — is the MCP server running?");
+      timer = setTimeout(connect, Math.min(10000, 1000 * Math.pow(1.5, retry++)));
+    };
+    ws.onerror = () => {};
+    ws.onmessage = (ev) => {
+      let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.type === "request") {
+        log("→ " + msg.command);
+        parent.postMessage({ pluginMessage: { type: "request", id: msg.id, command: msg.command, params: msg.params } }, "*");
+      } else if (msg.type === "ping") ws.send(JSON.stringify({ type: "pong" }));
+    };
+  }
+
+  onmessage = (ev) => {
+    const m = ev.data.pluginMessage;
+    if (!m) return;
+    if (m.type === "info") {
+      info = m.info;
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "hello", role: "plugin", info }));
+      else connect();
+    } else if (m.type === "info_update") {
+      Object.assign(info || {}, m.info);
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "plugin_update", info: m.info }));
+    } else if (m.type === "response") {
+      log((m.ok ? "✓ " : "✗ ") + (m.command || "") + (m.ok ? "" : " " + m.error));
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "response", id: m.id, ok: m.ok, result: m.result, error: m.error }));
+    }
+  };
+  $("reconnect").onclick = connect;
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "ping" })); }, 20000);
+</script>
+</body>
+</html>

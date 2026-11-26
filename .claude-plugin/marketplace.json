@@ -1,0 +1,12 @@
+{
+  "name": "figma-mcp-v2",
+  "owner": { "name": "Lukáš Anda", "url": "https://github.com/LukasAnda" },
+  "metadata": { "description": "Figma MCP server and design skill for Claude Code." },
+  "plugins": [
+    {
+      "name": "figma-mcp-v2",
+      "source": "./",
+      "description": "Read Figma designs without Dev Mode, download assets, and build or edit designs through a companion plugin."
+    }
+  ]
+}
