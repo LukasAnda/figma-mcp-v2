@@ -1,6 +1,6 @@
 {
   "name": "figma-mcp-v2",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Read Figma designs, components, tokens and assets without Dev Mode, and build or edit designs through a companion plugin.",
   "author": { "name": "Lukáš Anda", "url": "https://github.com/LukasAnda" },
   "homepage": "https://github.com/LukasAnda/figma-mcp-v2",
