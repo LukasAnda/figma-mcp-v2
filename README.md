@@ -33,10 +33,11 @@ Reading designs works right after step 1. Steps 2 and 3 are only needed for edit
 Node.js 20 or newer is required. Every client runs the same command:
 
 ```bash
-npx -y figma-mcp-v2
+npx -y figma-mcp-v2@latest
 ```
 
-The package is on npm as [`figma-mcp-v2`](https://www.npmjs.com/package/figma-mcp-v2). The latest code from GitHub works too:
+`@latest` makes each start pick up new versions; without it, npx keeps reusing the copy it
+cached first. The package is on npm as [`figma-mcp-v2`](https://www.npmjs.com/package/figma-mcp-v2). The latest code from GitHub works too:
 `npx -y github:LukasAnda/figma-mcp-v2` (the first start builds it, which takes about a minute).
 
 ### Claude Code
@@ -51,7 +52,7 @@ As a plugin, which adds the MCP server and a `figma-design` skill:
 Or only the server:
 
 ```bash
-claude mcp add figma -- npx -y figma-mcp-v2
+claude mcp add figma -- npx -y figma-mcp-v2@latest
 ```
 
 ### Gemini CLI
@@ -65,13 +66,13 @@ gemini extensions install https://github.com/LukasAnda/figma-mcp-v2
 Or only the server, in `~/.gemini/settings.json`:
 
 ```json
-{ "mcpServers": { "figma": { "command": "npx", "args": ["-y", "figma-mcp-v2"] } } }
+{ "mcpServers": { "figma": { "command": "npx", "args": ["-y", "figma-mcp-v2@latest"] } } }
 ```
 
 ### OpenAI Codex
 
 ```bash
-codex mcp add figma -- npx -y figma-mcp-v2
+codex mcp add figma -- npx -y figma-mcp-v2@latest
 ```
 
 or in `~/.codex/config.toml`:
@@ -79,7 +80,7 @@ or in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.figma]
 command = "npx"
-args = ["-y", "figma-mcp-v2"]
+args = ["-y", "figma-mcp-v2@latest"]
 startup_timeout_sec = 120
 ```
 
@@ -107,7 +108,7 @@ Cline MCP settings:
   "mcpServers": {
     "figma": {
       "command": "npx",
-      "args": ["-y", "figma-mcp-v2"],
+      "args": ["-y", "figma-mcp-v2@latest"],
       "env": { "FIGMA_ASSETS_DIR": "src/assets/figma" }
     }
   }
@@ -117,7 +118,7 @@ Cline MCP settings:
 ### VS Code (GitHub Copilot)
 
 ```bash
-code --add-mcp '{"name":"figma","command":"npx","args":["-y","figma-mcp-v2"]}'
+code --add-mcp '{"name":"figma","command":"npx","args":["-y","figma-mcp-v2@latest"]}'
 ```
 
 ### Zed
@@ -125,7 +126,7 @@ code --add-mcp '{"name":"figma","command":"npx","args":["-y","figma-mcp-v2"]}'
 In `settings.json`:
 
 ```json
-{ "context_servers": { "figma": { "command": { "path": "npx", "args": ["-y", "figma-mcp-v2"] } } } }
+{ "context_servers": { "figma": { "command": { "path": "npx", "args": ["-y", "figma-mcp-v2@latest"] } } } }
 ```
 
 ### From a clone
