@@ -21,8 +21,8 @@ export class FigmaApiError extends Error {
 export type Identity = "user" | "bot";
 
 function authHeaders(as: Identity = "user"): Record<string, string> {
-  const bot = process.env.FIGMA_BOT_TOKEN;
-  if (as === "bot" && bot) return { "X-Figma-Token": bot };
+  if (as === "bot" && process.env.FIGMA_BOT_TOKEN) return { "X-Figma-Token": process.env.FIGMA_BOT_TOKEN };
+  if (as === "bot" && process.env.FIGMA_BOT_OAUTH_TOKEN) return { Authorization: `Bearer ${process.env.FIGMA_BOT_OAUTH_TOKEN}` };
   const pat = process.env.FIGMA_TOKEN || process.env.FIGMA_ACCESS_TOKEN || process.env.FIGMA_API_KEY;
   const oauth = process.env.FIGMA_OAUTH_TOKEN;
   if (oauth) return { Authorization: `Bearer ${oauth}` };
@@ -71,7 +71,7 @@ export async function figmaGet<T>(
   if (!hasRestAuth(opts.as)) {
     throw new FigmaApiError(
       401,
-      "No Figma token configured. Set FIGMA_TOKEN (Figma > Settings > Security > Personal access tokens, scope file_content:read) in the MCP server env, or connect the companion plugin to read through it."
+      "Not logged in to Figma. Comments and private files need a login: call figma_login (opens figma.com in the browser), or run `npx -y figma-mcp-v2 login`. Reading designs from files shared by link works without it."
     );
   }
   const url = new URL(path, API_BASE);
@@ -106,7 +106,7 @@ export async function figmaGet<T>(
 }
 
 export async function figmaSend<T>(method: "POST" | "DELETE" | "PUT", path: string, body: unknown, signal?: AbortSignal, as: Identity = "user"): Promise<T> {
-  if (!hasRestAuth(as)) throw new FigmaApiError(401, "No Figma token configured. Set FIGMA_TOKEN (or FIGMA_BOT_TOKEN for replies) in the MCP server env.");
+  if (!hasRestAuth(as)) throw new FigmaApiError(401, "Not logged in to Figma. Call figma_login (opens figma.com in the browser), or run `npx -y figma-mcp-v2 login`.");
   const res = await fetch(new URL(path, API_BASE), {
     method,
     headers: { ...authHeaders(as), "Content-Type": "application/json", Accept: "application/json" },

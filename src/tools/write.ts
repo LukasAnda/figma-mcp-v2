@@ -12,6 +12,7 @@ import { parseFigmaUrl } from "../figma/url.js";
 import { DESTRUCTIVE, READ_ONLY, WRITE, json, text } from "./common.js";
 import { copyToClipboard, importSteps, installPlugin, reveal } from "../plugin-setup.js";
 import { loadFixRequests, respondToFixRequest } from "../comments.js";
+import { loginWithBrowser } from "../auth.js";
 import { installWatch, listWatches, uninstallWatch } from "../watch-service.js";
 
 const fileUrl = z.string().optional().describe("Figma link (or file key) of the file to edit. Needed only when the plugin is open in more than one file.");
@@ -637,6 +638,26 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
   );
 
   // REST write: comments do not need the plugin.
+  server.registerTool(
+    "figma_login",
+    {
+      title: "Log in to Figma",
+      description:
+        "Opens figma.com in the user's browser to log in (\"Allow access\"); the login is stored and renews itself. Needed for comments (#plsfix), private files and replies; reading designs from link-shared files works without it. Use account \"bot\" for the separate account that replies to #plsfix comments (the user should log in to it in a private window). Waits up to 5 minutes for the user to finish.",
+      inputSchema: z.object({ account: z.enum(["you", "bot"]).default("you") }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+    },
+    async ({ account }) => {
+      const r = await loginWithBrowser(account === "bot" ? "bot" : "user", () => {});
+      if ("setupNeeded" in r) {
+        return text(
+          "Browser login isn't set up yet: it needs a Figma OAuth app (one-time, about two minutes). Ask the user to run `npx -y figma-mcp-v2 login --setup-app` in a terminal, which walks through creating it, or `npx -y figma-mcp-v2 login --token` to paste a personal access token instead."
+        );
+      }
+      return text(`Logged in to Figma${r.name !== "?" ? ` as ${r.name}` : ""}${account === "bot" ? " (bot account: replies to #plsfix comments come from it)" : ""}. Comments and private files work now.`);
+    }
+  );
+
   server.registerTool(
     "figma_get_fix_requests",
     {

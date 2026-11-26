@@ -10,7 +10,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { CREDENTIALS_PATH, loadStoredCredentials } from "./auth.js";
+import { CREDENTIALS_PATH, loadStoredCredentials, refreshOAuthIfNeeded } from "./auth.js";
 import { fixPrompt, isActionable, loadFixRequests, respondToFixRequest, whoAmI, type FixRequest } from "./comments.js";
 import { parseFigmaUrl } from "./figma/url.js";
 
@@ -123,6 +123,8 @@ export async function runWatch(args: string[]): Promise<number> {
     return 0;
   }
   loadStoredCredentials();
+  await refreshOAuthIfNeeded();
+  setInterval(() => void refreshOAuthIfNeeded(), 6 * 3600_000).unref();
   const target = parseFigmaUrl(o.url);
   const log = (s: string) => console.error(`[watch ${new Date().toLocaleString()}] ${s}`);
   if (o.id) {
@@ -158,7 +160,11 @@ export async function runWatch(args: string[]): Promise<number> {
       log(`watching ${o.url} every ${o.interval}s; replies come from ${bot.handle}; ${o.exec ? `running: ${o.exec}` : o.agent === "notify" ? "notifying" : `running ${AGENTS[o.agent as Exclude<AgentName, "notify">].note}`}`);
       break;
     } catch (e) {
-      log(`waiting for Figma access: ${(e as Error).message} (run figma-mcp-v2 login)`);
+      const msg = (e as Error).message;
+      if (/\b403\b/.test(msg) && !authors && !o.anyone) {
+        log("can't tell whose comments to act on: the login lacks the current_user:read scope. Log in again (figma-mcp-v2 login), or pass --from <your Figma handle>.");
+      } else log(`waiting for Figma access: ${msg}`);
+      loadStoredCredentials(); // pick up a login that happened meanwhile
       if (o.once) return 1;
       await new Promise((r) => setTimeout(r, Math.min(300, 30 * (attempt + 1)) * 1000));
     }

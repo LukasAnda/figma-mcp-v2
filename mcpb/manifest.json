@@ -5,7 +5,7 @@
   "display_name": "Figma (no Dev Mode)",
   "version": "0.4.0",
   "description": "Read Figma designs, components, tokens and assets from a link without Dev Mode, and build or edit designs through a companion Figma plugin.",
-  "long_description": "Paste a Figma link and Claude can see the design and read its exact specs: layout, spacing, typography, colors, variables, components and assets. Downloading icons and images needs no Dev Mode, no paid seat and, for files shared by link, no token.\n\nWith the companion \"Figma MCP Bridge\" plugin running in Figma desktop, Claude can also build and change designs: whole screens with auto layout, components and variants, design tokens, dark themes, accessibility audits, annotations and Ready for dev status.\n\nTo set up the plugin, ask Claude to \"install the Figma plugin\", or download it from the GitHub releases page.",
+  "long_description": "Paste a Figma link and Claude can see the design and read its exact specs: layout, spacing, typography, colors, variables, components and assets. Downloading icons and images needs no Dev Mode, no paid seat and, for files shared by link, no token.\n\nWith the companion \"Figma MCP Bridge\" plugin running in Figma desktop, Claude can also build and change designs: whole screens with auto layout, components and variants, design tokens, dark themes, accessibility audits, annotations and Ready for dev status.\n\nTo set up the plugin, say \"set up Figma\". For comments and private files, say \"log me in to Figma\" (opens figma.com in your browser).",
   "author": {
     "name": "Lukáš Anda",
     "url": "https://github.com/LukasAnda"
@@ -44,16 +44,16 @@
   "user_config": {
     "figma_token": {
       "type": "string",
-      "title": "Figma personal access token (optional)",
-      "description": "Only needed for private files and comments. Figma > Settings > Security > Personal access tokens, scope file_content:read. Files shared as \"anyone with the link can view\" work without it.",
+      "title": "Figma personal access token (usually not needed)",
+      "description": "Leave empty and say \"log me in to Figma\" in a chat instead: that opens figma.com in your browser. Only fill this in if you prefer a personal access token (scopes: current user, file content, file metadata, comments read/write).",
       "sensitive": true,
       "required": false,
       "default": ""
     },
     "figma_bot_token": {
       "type": "string",
-      "title": "Bot account token (optional)",
-      "description": "Personal access token of a separate Figma account (for example \"Claude\") that replies to #plsfix comments under its own name. Scopes: file_content:read, file_comments:read, file_comments:write. Without it, replies come from your own token.",
+      "title": "Bot account token (usually not needed)",
+      "description": "Leave empty and say \"log the bot in to Figma\" instead. Only for a personal access token of the separate account that replies to #plsfix comments.",
       "sensitive": true,
       "required": false,
       "default": ""

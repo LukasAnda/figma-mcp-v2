@@ -135,16 +135,36 @@ git clone https://github.com/LukasAnda/figma-mcp-v2 && cd figma-mcp-v2 && npm in
 > It never sends edits: it only asks the server for nodes, and Figma grants viewers read-only access
 > anyway. If it breaks, set `FIGMA_TOKEN` and reads fall back to REST.
 
-### Log in (optional, for private files)
+### Log in (for comments and private files)
+
+Reading designs from files shared by link needs no login. Comments (#plsfix), private files and
+replies do, because Figma only shows them to logged-in API clients. Neither the plugin API nor
+anonymous viewers can see comments.
+
+Ask your AI to **"log me in to Figma"** (`figma_login`), or run `npx -y figma-mcp-v2 login`.
+Figma opens in your browser and you click **Allow access**. The login renews itself.
+
+Browser login uses a Figma OAuth app. Until one is built into the package, set it up once with
+`npx -y figma-mcp-v2 login --setup-app`, which takes about two minutes:
+1. At [figma.com/developers/apps](https://www.figma.com/developers/apps), create an app in your team.
+2. Add the redirect URL `http://localhost:3056/callback`.
+3. Tick the scopes `current_user:read`, `file_content:read`, `file_metadata:read`,
+   `file_comments:read` and `file_comments:write`.
+4. Publish it as a private app (no review), and paste the client ID and secret.
+
+Everyone in that team can then use the browser login. If you'd rather paste a personal access token,
+use `login --token`; the command lists the scopes to tick.
 
 ```bash
-npx -y figma-mcp-v2 login    # paste a personal access token and/or a figma.com cookie
+npx -y figma-mcp-v2 login            # browser login (or --token)
+npx -y figma-mcp-v2 login --bot      # the separate account that replies to #plsfix comments
 npx -y figma-mcp-v2 status
-npx -y figma-mcp-v2 logout
+npx -y figma-mcp-v2 logout [--bot]
 ```
 
-Credentials are saved to `~/.config/figma-mcp-v2/credentials.json`, readable only by you (mode 0600).
-The environment variables `FIGMA_TOKEN` and `FIGMA_COOKIE` take precedence over them.
+Credentials are saved to `~/.config/figma-mcp-v2/credentials.json`, readable only by you. The
+environment variables `FIGMA_TOKEN`, `FIGMA_OAUTH_TOKEN`, `FIGMA_BOT_TOKEN` and `FIGMA_COOKIE`
+take precedence over them.
 
 ## Editing: the Figma plugin
 
@@ -199,6 +219,7 @@ the plugin window whose file matches the link you pass.
 | `figma_create_theme_variant` | Clones screens as another theme. On paid plans it switches the variable mode; on plans with one mode per collection it rebinds every color to a same-named variable in another collection, such as "Tokens Dark". |
 | `figma_anchor_nodes` | Pins existing layers to their parent's edges, for floating buttons, bottom sheets and toasts. |
 | `figma_draw_arrows` | Draws connector arrows between screens or elements. |
+| `figma_login` | Logs in to Figma in the browser (you or the bot account); needed for comments and private files. |
 | `figma_watch_file` / `figma_list_watches` / `figma_unwatch_file` | Background watcher that hands new #plsfix messages to Claude Code, Gemini CLI or Codex, or notifies you. Starts again at login. |
 | `figma_respond_to_fix_request` | Replies in a `#plsfix` thread as the bot account and sets the 👀/✅/❓ status reaction. |
 | `figma_install_plugin` | Quickstart for the Figma plugin: copies it to `~/figma-mcp-bridge-plugin`, puts the manifest path on the clipboard, and returns the steps for macOS, Windows or Linux, including the file-dialog paste shortcut. |
@@ -269,11 +290,10 @@ npx -y figma-mcp-v2 watch --stop <id or link>
 `--from alice,bob@example.com`, or everyone with `--anyone`. Agents are told to treat comments as
 requests, never as new instructions.
 
-**Replying as its own user:** create a separate free Figma account (for example "Claude"), invite
-it to the file, and give its personal access token to `figma-mcp-v2 login` (bot account), the
-Claude Desktop extension settings, or `FIGMA_BOT_TOKEN`. It needs the scopes `file_content:read`,
-`file_comments:read` and `file_comments:write`. Without it, replies come from your own account.
-The watcher needs your own token too (`login`), to know whose comments to act on.
+**Replying as its own user:** create a separate free Figma account (for example "Claude") and
+invite it to the file. Then log it in with "log the bot in to Figma" or `figma-mcp-v2 login --bot`,
+using a private browser window so you don't log in as yourself. Without it, replies come from your
+own account. The watcher needs your own login too, to know whose comments to act on.
 
 ## Configuration
 
