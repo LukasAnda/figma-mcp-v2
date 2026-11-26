@@ -19,10 +19,11 @@ VS Code (Copilot), Windsurf, Zed, Cline and others.
 Node.js 20 or newer is required. Every client runs the same command:
 
 ```bash
-npx -y github:LukasAnda/figma-mcp-v2
+npx -y figma-mcp-v2
 ```
 
-The first start downloads and builds the package, which takes about a minute. Later starts are instant.
+The package is on npm as [`figma-mcp-v2`](https://www.npmjs.com/package/figma-mcp-v2). The latest code from GitHub works too:
+`npx -y github:LukasAnda/figma-mcp-v2` (the first start builds it, which takes about a minute).
 
 ### Claude Code
 
@@ -36,7 +37,7 @@ As a plugin, which adds the MCP server and a `figma-design` skill:
 Or only the server:
 
 ```bash
-claude mcp add figma -- npx -y github:LukasAnda/figma-mcp-v2
+claude mcp add figma -- npx -y figma-mcp-v2
 ```
 
 ### Gemini CLI
@@ -50,13 +51,13 @@ gemini extensions install https://github.com/LukasAnda/figma-mcp-v2
 Or only the server, in `~/.gemini/settings.json`:
 
 ```json
-{ "mcpServers": { "figma": { "command": "npx", "args": ["-y", "github:LukasAnda/figma-mcp-v2"] } } }
+{ "mcpServers": { "figma": { "command": "npx", "args": ["-y", "figma-mcp-v2"] } } }
 ```
 
 ### OpenAI Codex
 
 ```bash
-codex mcp add figma -- npx -y github:LukasAnda/figma-mcp-v2
+codex mcp add figma -- npx -y figma-mcp-v2
 ```
 
 or in `~/.codex/config.toml`:
@@ -64,7 +65,7 @@ or in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.figma]
 command = "npx"
-args = ["-y", "github:LukasAnda/figma-mcp-v2"]
+args = ["-y", "figma-mcp-v2"]
 startup_timeout_sec = 120
 ```
 
@@ -78,7 +79,7 @@ Add this to `.cursor/mcp.json` (Cursor), `~/.codeium/windsurf/mcp_config.json` (
   "mcpServers": {
     "figma": {
       "command": "npx",
-      "args": ["-y", "github:LukasAnda/figma-mcp-v2"],
+      "args": ["-y", "figma-mcp-v2"],
       "env": { "FIGMA_ASSETS_DIR": "src/assets/figma" }
     }
   }
@@ -88,7 +89,7 @@ Add this to `.cursor/mcp.json` (Cursor), `~/.codeium/windsurf/mcp_config.json` (
 ### VS Code (GitHub Copilot)
 
 ```bash
-code --add-mcp '{"name":"figma","command":"npx","args":["-y","github:LukasAnda/figma-mcp-v2"]}'
+code --add-mcp '{"name":"figma","command":"npx","args":["-y","figma-mcp-v2"]}'
 ```
 
 ### Zed
@@ -96,7 +97,7 @@ code --add-mcp '{"name":"figma","command":"npx","args":["-y","github:LukasAnda/f
 In `settings.json`:
 
 ```json
-{ "context_servers": { "figma": { "command": { "path": "npx", "args": ["-y", "github:LukasAnda/figma-mcp-v2"] } } } }
+{ "context_servers": { "figma": { "command": { "path": "npx", "args": ["-y", "figma-mcp-v2"] } } } }
 ```
 
 ### From a clone
@@ -123,9 +124,9 @@ git clone https://github.com/LukasAnda/figma-mcp-v2 && cd figma-mcp-v2 && npm in
 ### Log in (optional, for private files)
 
 ```bash
-npx -y github:LukasAnda/figma-mcp-v2 login    # paste a personal access token and/or a figma.com cookie
-npx -y github:LukasAnda/figma-mcp-v2 status
-npx -y github:LukasAnda/figma-mcp-v2 logout
+npx -y figma-mcp-v2 login    # paste a personal access token and/or a figma.com cookie
+npx -y figma-mcp-v2 status
+npx -y figma-mcp-v2 logout
 ```
 
 Credentials are saved to `~/.config/figma-mcp-v2/credentials.json`, readable only by you (mode 0600).
@@ -136,7 +137,7 @@ The environment variables `FIGMA_TOKEN` and `FIGMA_COOKIE` take precedence over 
 Figma's REST API cannot edit layers, so edits go through a small development plugin that runs in
 your own signed-in Figma. You don't share any credentials with the server.
 
-1. Print the plugin's location: `npx -y github:LukasAnda/figma-mcp-v2 plugin`. In a clone it is `plugin/manifest.json`.
+1. Print the plugin's location: `npx -y figma-mcp-v2 plugin`. In a clone it is `plugin/manifest.json`.
 2. In Figma desktop, right-click the canvas and choose **Plugins → Development → Import plugin from
    manifest…**, then pick that file. You only need to do this once.
 3. In the file you want to edit, run **Plugins → Development → Figma MCP Bridge**. The window

@@ -6,7 +6,7 @@
   "mcpServers": {
     "figma": {
       "command": "npx",
-      "args": ["-y", "github:LukasAnda/figma-mcp-v2"]
+      "args": ["-y", "figma-mcp-v2"]
     }
   }
 }
