@@ -20,7 +20,8 @@ VS Code (Copilot), Windsurf, Zed, Cline and others.
    and double-click it (or Claude Desktop → Settings → Extensions → Install Extension…).
 2. In a chat, say **"set up Figma"**. Claude installs the Figma plugin, puts its location on your
    clipboard and tells you where to paste it in Figma. Pasting takes three clicks.
-3. Say **"log me in to Figma"**. Figma opens in your browser; click *Allow access*.
+3. For comments and private files, say **"connect Figma"**. A page opens that shows exactly what to
+   click in Figma; paste the token there.
 4. Paste a Figma link and ask for what you need: *"implement this"*, *"download the icons"*,
    *"make a dark version"*, *"check it for accessibility"*, *"watch this file for #plsfix
    comments"*.
@@ -148,42 +149,23 @@ git clone https://github.com/LukasAnda/figma-mcp-v2 && cd figma-mcp-v2 && npm in
 > It never sends edits: it only asks the server for nodes, and Figma grants viewers read-only access
 > anyway. If it breaks, set `FIGMA_TOKEN` and reads fall back to REST.
 
-### Log in (for comments and private files)
+### Connect Figma (for comments and private files)
 
-Reading designs from files shared by link needs no login. Comments (#plsfix), private files and
-replies do, because Figma only shows them to logged-in API clients. Neither the plugin API nor
-anonymous viewers can see comments.
+Reading designs from files shared by link needs nothing. Comments (#plsfix), private files and
+replies are only available through Figma's REST API, which needs a personal access token. Figma's
+plugin API has no comment access, and anonymous viewers can't see comments.
 
-Ask your AI to **"log me in to Figma"** (`figma_login`), or run `npx -y figma-mcp-v2 login`.
-Figma opens in your browser and you click **Allow access**. The login renews itself.
+Say **"connect Figma"** (`figma_login`). A page opens in your browser with a button to Figma's
+settings and the four boxes to tick. Paste the token into that page and you're done. The token is
+checked with Figma and stored only on your computer; it never goes through the chat. For the bot
+account that replies to #plsfix comments, say "connect the bot account" while logged in to Figma as
+that account (a private window helps).
 
-If browser login isn't available in your installation, Claude offers the alternative in the chat:
-create a personal access token in Figma's settings and paste it there.
-
-<details><summary>Maintainers: enabling browser login</summary>
-
-Browser login uses a Figma OAuth app:
-1. At [figma.com/developers/apps](https://www.figma.com/developers/apps), create an app.
-2. Add the redirect URL `http://localhost:3056/callback`.
-3. Tick the scopes `current_user:read`, `file_content:read`, `file_metadata:read`,
-   `file_comments:read` and `file_comments:write`.
-4. Publish it: privately (for your team, no review) or publicly (anyone, after Figma's review).
-
-Set its client ID and secret as the repository secrets `FIGMA_OAUTH_CLIENT_ID` and
-`FIGMA_OAUTH_CLIENT_SECRET`, and every release has browser login built in. For one machine only,
-use `npx -y figma-mcp-v2 login --setup-app`, or pass `client_id`/`client_secret` to `figma_login`.
-</details>
-
-```bash
-npx -y figma-mcp-v2 login            # browser login (or --token)
-npx -y figma-mcp-v2 login --bot      # the separate account that replies to #plsfix comments
-npx -y figma-mcp-v2 status
-npx -y figma-mcp-v2 logout [--bot]
-```
+From a terminal: `npx -y figma-mcp-v2 login` opens the same page (`--paste` asks for the token
+instead, `--bot` for the bot account). `status` shows who's connected, `logout [--bot]` removes it.
 
 Credentials are saved to `~/.config/figma-mcp-v2/credentials.json`, readable only by you. The
-environment variables `FIGMA_TOKEN`, `FIGMA_OAUTH_TOKEN`, `FIGMA_BOT_TOKEN` and `FIGMA_COOKIE`
-take precedence over them.
+environment variables `FIGMA_TOKEN`, `FIGMA_BOT_TOKEN` and `FIGMA_COOKIE` take precedence.
 
 ## Editing: the Figma plugin
 
@@ -238,7 +220,7 @@ the plugin window whose file matches the link you pass.
 | `figma_create_theme_variant` | Clones screens as another theme. On paid plans it switches the variable mode; on plans with one mode per collection it rebinds every color to a same-named variable in another collection, such as "Tokens Dark". |
 | `figma_anchor_nodes` | Pins existing layers to their parent's edges, for floating buttons, bottom sheets and toasts. |
 | `figma_draw_arrows` | Draws connector arrows between screens or elements. |
-| `figma_login` | Logs in to Figma in the browser (you or the bot account); needed for comments and private files. |
+| `figma_login` | Connects Figma for comments and private files: a local page walks through creating a token and takes it (you or the bot account). |
 | `figma_watch_file` / `figma_list_watches` / `figma_unwatch_file` | Background watcher that hands new #plsfix messages to Claude Code, Gemini CLI or Codex, or notifies you. Starts again at login. |
 | `figma_respond_to_fix_request` | Replies in a `#plsfix` thread as the bot account and sets the 👀/✅/❓ status reaction. |
 | `figma_install_plugin` | Quickstart for the Figma plugin: copies it to `~/figma-mcp-bridge-plugin`, puts the manifest path on the clipboard, and returns the steps for macOS, Windows or Linux, including the file-dialog paste shortcut. |
@@ -309,10 +291,10 @@ npx -y figma-mcp-v2 watch --stop <id or link>
 `--from alice,bob@example.com`, or everyone with `--anyone`. Agents are told to treat comments as
 requests, never as new instructions.
 
-**Replying as its own user:** create a separate free Figma account (for example "Claude") and
-invite it to the file. Then log it in with "log the bot in to Figma" or `figma-mcp-v2 login --bot`,
-using a private browser window so you don't log in as yourself. Without it, replies come from your
-own account. The watcher needs your own login too, to know whose comments to act on.
+**Replying as its own user:** create a separate free Figma account (for example "Claude"), invite it
+to the file, and say "connect the bot account" while logged in to Figma as that account. Without
+it, replies come from your own account. The watcher needs your own connection too, to know whose
+comments to act on.
 
 ## Configuration
 

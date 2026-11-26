@@ -15,7 +15,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/server";
-import { loadStoredCredentials, refreshOAuthIfNeeded, runAuthCli } from "./auth.js";
+import { loadStoredCredentials, runAuthCli } from "./auth.js";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
 import { bridge } from "./bridge/bridge.js";
@@ -33,7 +33,7 @@ export function createServer(): McpServer {
       instructions: `Figma tools. Pass Figma links as \`url\` (right-click a layer in Figma > Copy link to selection gives a link with node-id).
 Reading needs no Dev Mode and no token for files shared by link: figma_get_file (pages/frames) → figma_get_design (layout/styles/tokens spec) + figma_get_screenshot (see it) → figma_get_code (starting code) → figma_download_assets (icons/images). figma_get_variables / figma_get_styles / figma_get_components describe the design system.
 Editing needs the "Figma MCP Bridge" plugin running in the file; check with figma_plugin_status.
-Login: reading link-shared designs needs none. Comments, private files and replies need a Figma login; if a tool says "Not logged in", call figma_login (it opens figma.com in the browser).
+Login: reading link-shared designs needs none. Comments, private files and replies need a Figma login; if a tool says "Not logged in", call figma_login (it opens a page on this computer that walks the user through connecting Figma).
 Comments: "#plsfix" threads in Figma are fix requests (figma_get_fix_requests / figma_respond_to_fix_request). When the user asks to watch a file or handle its comments automatically, use figma_watch_file.
 First run: if the user has just installed this server, asks how to get started, or wants to edit and figma_plugin_status shows no plugin, call figma_install_plugin and walk them through the numbered steps it returns (the manifest path is already on their clipboard). Mention that reading designs works right away without the plugin. Never edit unless the user asked for changes.
 Building designs: use figma_build_layout to create whole screens in one call (auto layout, components, variants, instances, token bindings, sections, arrows), then check the returned screenshot. Bind colors to variables (figma_bind_tokens) so themes work; figma_create_theme_variant makes dark (or other) variants. Present flows like a design team: one section per flow with a title, per-state headings with requirements, screens, short notes beside them, and arrows for navigation.`
@@ -158,9 +158,9 @@ if (cli === "help" || cli === "--help" || cli === "-h") {
 
 Usage:
   figma-mcp-v2            run the MCP server on stdio (what MCP clients start)
-  figma-mcp-v2 login [--bot] [--token] [--setup-app]
-                          log in to Figma in the browser (--token: paste a personal access token
-                          instead; --bot: the account that replies to #plsfix comments)
+  figma-mcp-v2 login [--bot] [--paste]
+                          connect Figma: opens a page that walks through creating a token
+                          (--paste: paste it here instead; --bot: the account that replies to #plsfix)
   figma-mcp-v2 status     show who is logged in
   figma-mcp-v2 logout [--bot]
   figma-mcp-v2 plugin install [dir]   copy the Figma plugin to ~/figma-mcp-bridge-plugin (or dir) and show it
@@ -173,7 +173,6 @@ Usage:
 }
 
 loadStoredCredentials();
-void refreshOAuthIfNeeded();
 void refreshInstalledPlugin();
 if (process.env.FIGMA_NO_BRIDGE !== "1") void bridge.start();
 

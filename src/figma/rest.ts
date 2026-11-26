@@ -22,7 +22,6 @@ export type Identity = "user" | "bot";
 
 function authHeaders(as: Identity = "user"): Record<string, string> {
   if (as === "bot" && process.env.FIGMA_BOT_TOKEN) return { "X-Figma-Token": process.env.FIGMA_BOT_TOKEN };
-  if (as === "bot" && process.env.FIGMA_BOT_OAUTH_TOKEN) return { Authorization: `Bearer ${process.env.FIGMA_BOT_OAUTH_TOKEN}` };
   const pat = process.env.FIGMA_TOKEN || process.env.FIGMA_ACCESS_TOKEN || process.env.FIGMA_API_KEY;
   const oauth = process.env.FIGMA_OAUTH_TOKEN;
   if (oauth) return { Authorization: `Bearer ${oauth}` };
@@ -71,7 +70,7 @@ export async function figmaGet<T>(
   if (!hasRestAuth(opts.as)) {
     throw new FigmaApiError(
       401,
-      "Not logged in to Figma. Comments and private files need a login: call figma_login, which opens figma.com in the user's browser. Reading designs from files shared by link works without it."
+      "Not connected to Figma. Comments and private files need it: call figma_login, which opens a page that walks the user through it. Reading designs from files shared by link works without it."
     );
   }
   const url = new URL(path, API_BASE);
@@ -106,7 +105,7 @@ export async function figmaGet<T>(
 }
 
 export async function figmaSend<T>(method: "POST" | "DELETE" | "PUT", path: string, body: unknown, signal?: AbortSignal, as: Identity = "user"): Promise<T> {
-  if (!hasRestAuth(as)) throw new FigmaApiError(401, "Not logged in to Figma. Call figma_login, which opens figma.com in the user's browser.");
+  if (!hasRestAuth(as)) throw new FigmaApiError(401, "Not connected to Figma. Call figma_login, which opens a page that walks the user through it.");
   const res = await fetch(new URL(path, API_BASE), {
     method,
     headers: { ...authHeaders(as), "Content-Type": "application/json", Accept: "application/json" },

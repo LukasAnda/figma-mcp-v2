@@ -12,7 +12,7 @@ import { parseFigmaUrl } from "../figma/url.js";
 import { DESTRUCTIVE, READ_ONLY, WRITE, json, text } from "./common.js";
 import { copyToClipboard, importSteps, installPlugin, reveal } from "../plugin-setup.js";
 import { loadFixRequests, respondToFixRequest } from "../comments.js";
-import { OAUTH_REDIRECT, loginWithBrowser, saveOAuthApp, saveToken } from "../auth.js";
+import { loginInBrowser, saveToken } from "../auth.js";
 import { installWatch, listWatches, uninstallWatch } from "../watch-service.js";
 
 const fileUrl = z.string().optional().describe("Figma link (or file key) of the file to edit. Needed only when the plugin is open in more than one file.");
@@ -641,32 +641,25 @@ Example: const f = figma.createFrame(); f.layoutMode = "VERTICAL"; f.itemSpacing
   server.registerTool(
     "figma_login",
     {
-      title: "Log in to Figma",
-      description: `Logs in to Figma, needed for comments (#plsfix), private files and replies; reading designs from link-shared files works without it. The login is stored and renews itself.
-- Default: opens figma.com in the user's browser; they click "Allow access". Waits up to 5 minutes.
-- account "bot": the separate account that replies to #plsfix comments; tell the user to finish the login in a private browser window, logged in as that account.
-- token: if browser login isn't available, the user can create a personal access token (figma.com > Settings > Security > Personal access tokens, scopes: Current user read, File content read, File metadata read, Comments read and write) and paste it; pass it here.
-- client_id + client_secret: for whoever maintains the setup, to register the Figma OAuth app that browser login uses.`,
+      title: "Connect Figma",
+      description: `Connects Figma for comments (#plsfix), private files and replies; reading designs from link-shared files works without it. Opens a page on this computer that walks the user through creating a Figma token (link to Figma's settings, which boxes to tick) and takes it there, so it never goes through the chat. Tell the user a page opened in their browser, then wait: this returns when they've finished (up to 10 minutes).
+- account "bot": the separate account that replies to #plsfix comments; the user should be logged in to Figma as that account (a private window helps).
+- token: only if the user already pasted a token in the chat.`,
       inputSchema: z.object({
         account: z.enum(["you", "bot"]).default("you"),
-        token: z.string().optional().describe("A personal access token the user pasted"),
-        client_id: z.string().optional(),
-        client_secret: z.string().optional()
+        token: z.string().optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
-    async ({ account, token, client_id, client_secret }) => {
+    async ({ account, token }) => {
       const who = account === "bot" ? "bot" : "user";
-      if (client_id && client_secret) await saveOAuthApp(client_id, client_secret);
-      if (token) {
-        const r = await saveToken(who, token);
-        return text(`Saved the token${r.name !== "?" ? ` for ${r.name}` : ""}${who === "bot" ? " (bot account)" : ""}. Comments and private files work now.${r.scopeWarning ? " " + r.scopeWarning : ""} Tell the user they can delete the token from this conversation's history if they like; it's stored on this computer only.`);
-      }
-      const r = await loginWithBrowser(who, () => {});
-      if ("setupNeeded" in r) {
-        return text(`Browser login isn't available in this installation yet. Offer the user the simple alternative: create a personal access token at https://www.figma.com/settings (Security > Personal access tokens > Generate new token; tick Current user: read, File content: read, File metadata: read, Comments: read and write) and paste it here, then call figma_login with token. (Whoever maintains this setup can enable browser login for everyone by registering a Figma OAuth app with redirect URL ${OAUTH_REDIRECT} and passing client_id and client_secret.)`);
-      }
-      return text(`Logged in to Figma${r.name !== "?" ? ` as ${r.name}` : ""}${who === "bot" ? " (bot account: replies to #plsfix comments come from it)" : ""}. Comments and private files work now.`);
+      let url = "";
+      const r = token ? await saveToken(who, token) : await loginInBrowser(who, (u) => (url = u));
+      return text(
+        `Connected Figma${r.name !== "?" ? ` as ${r.name}` : ""}${who === "bot" ? " (bot account: replies to #plsfix comments come from it)" : ""}. Comments and private files work now.` +
+          (r.scopeWarning ? ` ${r.scopeWarning}` : "") +
+          (token ? " The token is stored on this computer; the user may want to delete it from this conversation." : url ? "" : "")
+      );
     }
   );
 

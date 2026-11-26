@@ -23,11 +23,6 @@ jobs:
         run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
-      - name: Built-in OAuth app for browser login
-        run: node scripts/inject-oauth-app.mjs
-        env:
-          FIGMA_OAUTH_CLIENT_ID: ${{ secrets.FIGMA_OAUTH_CLIENT_ID }}
-          FIGMA_OAUTH_CLIENT_SECRET: ${{ secrets.FIGMA_OAUTH_CLIENT_SECRET }}
       - name: Tag matches package.json
         run: |
           expected="v$(node -p "require('./package.json').version")"

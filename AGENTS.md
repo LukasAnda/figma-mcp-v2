@@ -57,11 +57,9 @@ The `Release` workflow tests and publishes the tag to npm (trusted publishing, w
 builds the Claude Desktop extension (`figma-mcp-v2.mcpb`) and the Figma plugin zip with
 `npm run bundle`, and attaches both to a GitHub release. Never publish from a laptop except for the very first version.
 
-Browser login: the release writes `src/oauth-app.ts` from the secrets `FIGMA_OAUTH_CLIENT_ID` /
-`FIGMA_OAUTH_CLIENT_SECRET` (scripts/inject-oauth-app.mjs). Never commit real values to that file.
-
 User-facing text (tool results, errors, README quick start) must not require a terminal: point to
-something the user can say in chat ("set up Figma", "log me in to Figma").
+something the user can say in chat ("set up Figma", "connect Figma"). No OAuth app: login is a personal access token taken by a
+local page (src/auth.ts), never pasted in a terminal or chat.
 
 Signing the Claude Desktop extension is optional. When the repository secrets `MCPB_SIGNING_CERT`
 and `MCPB_SIGNING_KEY` (PEM text, plus `MCPB_SIGNING_CHAIN` for intermediates) are set, the
