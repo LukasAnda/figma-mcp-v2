@@ -12,12 +12,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-          cache: npm
+          # No dependency cache here: a poisoned cache must not reach a published package.
+          package-manager-cache: false
       - name: npm with trusted publishing support (11.5.1+)
         run: npm install -g npm@latest
       - run: npm ci
