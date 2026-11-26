@@ -162,8 +162,8 @@ export async function runWatch(args: string[]): Promise<number> {
     } catch (e) {
       const msg = (e as Error).message;
       if (/\b403\b/.test(msg) && !authors && !o.anyone) {
-        log("can't tell whose comments to act on: the login lacks the current_user:read scope. Log in again (figma-mcp-v2 login), or pass --from <your Figma handle>.");
-      } else log(`waiting for Figma access: ${msg}`);
+        log("can't tell whose comments to act on: the login lacks the current_user:read scope. Say \"log me in to Figma\" in your AI app, or pass --from <your Figma handle>.");
+      } else log(`waiting for a Figma login (say "log me in to Figma" in your AI app): ${msg}`);
       loadStoredCredentials(); // pick up a login that happened meanwhile
       if (o.once) return 1;
       await new Promise((r) => setTimeout(r, Math.min(300, 30 * (attempt + 1)) * 1000));

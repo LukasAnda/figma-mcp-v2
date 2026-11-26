@@ -21,6 +21,7 @@ import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
+import { BUILT_IN_APP } from "./oauth-app.js";
 
 export type Who = "user" | "bot";
 
@@ -45,8 +46,6 @@ export interface Credentials {
 
 export const CREDENTIALS_PATH = path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), "figma-mcp-v2", "credentials.json");
 
-/** OAuth app baked into published builds (empty until one is registered for the project). */
-const BUILT_IN_APP = { clientId: "", clientSecret: "" };
 
 export const OAUTH_PORT = Number(process.env.FIGMA_OAUTH_PORT ?? 3056);
 export const OAUTH_REDIRECT = `http://localhost:${OAUTH_PORT}/callback`;
@@ -120,7 +119,7 @@ export async function refreshOAuthIfNeeded(withinDays = 14): Promise<void> {
       if (key === "botOauth" && !process.env.FIGMA_BOT_TOKEN) process.env.FIGMA_BOT_OAUTH_TOKEN = r.access_token;
       changed = true;
     } catch (e) {
-      console.error(`[figma-mcp-v2] could not refresh the Figma login (${(e as Error).message}); run figma-mcp-v2 login`);
+      console.error(`[figma-mcp-v2] could not renew the Figma login (${(e as Error).message}); say "log me in to Figma" in your AI app`);
     }
   }
   if (changed) await save(c);
@@ -194,6 +193,30 @@ export async function loginWithBrowser(who: Who, log: (s: string) => void): Prom
   }
   await save(c);
   return { name };
+}
+
+/** Stores a personal access token pasted in a chat (fallback when browser login isn't available). */
+export async function saveToken(who: Who, token: string): Promise<{ name: string; scopeWarning?: string }> {
+  const id = await identify({ "X-Figma-Token": token.trim() });
+  if (!id.ok && id.status !== 403) throw new Error(`Figma doesn't accept this token (HTTP ${id.status}). Check it was copied completely.`);
+  const c = readCreds();
+  const name = id.ok ? id.name : "?";
+  if (who === "bot") {
+    Object.assign(c, { botToken: token.trim(), bot: name });
+    process.env.FIGMA_BOT_TOKEN = token.trim();
+  } else {
+    Object.assign(c, { token: token.trim(), user: name });
+    process.env.FIGMA_TOKEN = token.trim();
+  }
+  await save(c);
+  return id.ok ? { name } : { name, scopeWarning: "The token lacks the \"Current user\" scope, so watching #plsfix comments can't tell whose they are. A new token with that scope fixes it." };
+}
+
+/** Stores the OAuth app that browser login uses (for whoever maintains a setup, from a chat). */
+export async function saveOAuthApp(clientId: string, clientSecret: string): Promise<void> {
+  const c = readCreds();
+  c.app = { clientId: clientId.trim(), clientSecret: clientSecret.trim() };
+  await save(c);
 }
 
 // ---------- CLI ----------

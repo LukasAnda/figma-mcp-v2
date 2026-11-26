@@ -14,7 +14,20 @@ agent:  figma_get_screenshot → figma_get_design → figma_download_assets → 
 It works with any MCP client: Claude Code, Claude Desktop, Gemini CLI, OpenAI Codex, Cursor,
 VS Code (Copilot), Windsurf, Zed, Cline and others.
 
-## Install
+## Quick start, without a terminal (Claude Desktop)
+
+1. Download **[figma-mcp-v2.mcpb](https://github.com/LukasAnda/figma-mcp-v2/releases/latest/download/figma-mcp-v2.mcpb)**
+   and double-click it (or Claude Desktop → Settings → Extensions → Install Extension…).
+2. In a chat, say **"set up Figma"**. Claude installs the Figma plugin, puts its location on your
+   clipboard and tells you where to paste it in Figma. Pasting takes three clicks.
+3. Say **"log me in to Figma"**. Figma opens in your browser; click *Allow access*.
+4. Paste a Figma link and ask for what you need: *"implement this"*, *"download the icons"*,
+   *"make a dark version"*, *"check it for accessibility"*, *"watch this file for #plsfix
+   comments"*.
+
+Reading designs works right after step 1. Steps 2 and 3 are only needed for editing and comments.
+
+## Install for developers
 
 Node.js 20 or newer is required. Every client runs the same command:
 
@@ -144,16 +157,22 @@ anonymous viewers can see comments.
 Ask your AI to **"log me in to Figma"** (`figma_login`), or run `npx -y figma-mcp-v2 login`.
 Figma opens in your browser and you click **Allow access**. The login renews itself.
 
-Browser login uses a Figma OAuth app. Until one is built into the package, set it up once with
-`npx -y figma-mcp-v2 login --setup-app`, which takes about two minutes:
-1. At [figma.com/developers/apps](https://www.figma.com/developers/apps), create an app in your team.
+If browser login isn't available in your installation, Claude offers the alternative in the chat:
+create a personal access token in Figma's settings and paste it there.
+
+<details><summary>Maintainers: enabling browser login</summary>
+
+Browser login uses a Figma OAuth app:
+1. At [figma.com/developers/apps](https://www.figma.com/developers/apps), create an app.
 2. Add the redirect URL `http://localhost:3056/callback`.
 3. Tick the scopes `current_user:read`, `file_content:read`, `file_metadata:read`,
    `file_comments:read` and `file_comments:write`.
-4. Publish it as a private app (no review), and paste the client ID and secret.
+4. Publish it: privately (for your team, no review) or publicly (anyone, after Figma's review).
 
-Everyone in that team can then use the browser login. If you'd rather paste a personal access token,
-use `login --token`; the command lists the scopes to tick.
+Set its client ID and secret as the repository secrets `FIGMA_OAUTH_CLIENT_ID` and
+`FIGMA_OAUTH_CLIENT_SECRET`, and every release has browser login built in. For one machine only,
+use `npx -y figma-mcp-v2 login --setup-app`, or pass `client_id`/`client_secret` to `figma_login`.
+</details>
 
 ```bash
 npx -y figma-mcp-v2 login            # browser login (or --token)
